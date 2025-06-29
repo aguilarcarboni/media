@@ -13,6 +13,7 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var movies: [Movie]
     @StateObject private var cloudKitManager = CloudKitManager.shared
+    
     @State private var showingCreateSheet = false
     @State private var showingImportSheet = false
     @State private var selectedMovie: Movie?
