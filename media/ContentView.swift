@@ -109,20 +109,6 @@ struct ContentView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
-        .sheet(isPresented: $showingCreateSheet) {
-            CreateMovieView()
-        }
-        .sheet(isPresented: $showingImportSheet) {
-            CSVImportView()
-        }
-        .sheet(isPresented: $showingMovieDetail) {
-            if let selectedMovie = selectedMovie {
-                NavigationStack {
-                    MovieView(movie: selectedMovie)
-                        .navigationTitle(selectedMovie.title)
-                }
-            }
-        }
         .cloudKitStatusAlert()
         .task {
             await cloudKitManager.checkCloudKitStatus()

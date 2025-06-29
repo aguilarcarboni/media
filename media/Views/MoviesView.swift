@@ -57,6 +57,20 @@ struct MoviesView: View {
             }
         }
         .navigationTitle("Movies (\(movies.count))")
+        .sheet(isPresented: $showingCreateSheet) {
+            CreateMovieView()
+        }
+        .sheet(isPresented: $showingImportSheet) {
+            CSVImportView()
+        }
+        .sheet(isPresented: $showingMovieDetail) {
+            if let selectedMovie = selectedMovie {
+                NavigationStack {
+                    MovieView(movie: selectedMovie)
+                        .navigationTitle(selectedMovie.title)
+                }
+            }
+        }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button(action: { showingImportSheet = true }) {
