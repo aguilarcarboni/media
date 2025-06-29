@@ -10,9 +10,22 @@
 		912A99D52E11013F008B1613 /* media.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = media.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		912A9A8C2E11278D008B1613 /* Exceptions for "media" folder in "media" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 912A99D42E11013F008B1613 /* media */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		912A99D72E11013F008B1613 /* media */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				912A9A8C2E11278D008B1613 /* Exceptions for "media" folder in "media" target */,
+			);
 			path = media;
 			sourceTree = "<group>";
 		};
