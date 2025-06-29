@@ -120,14 +120,6 @@ struct ContentView: View {
                 NavigationStack {
                     MovieView(movie: selectedMovie)
                         .navigationTitle(selectedMovie.title)
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button("Done") {
-                                    showingMovieDetail = false
-                                }
-                            }
-                        }
                 }
             }
         }
