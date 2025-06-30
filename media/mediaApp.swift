@@ -13,6 +13,7 @@ struct mediaApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Movie.self,
+            TVShow.self,
         ])
         
         // Configure for CloudKit

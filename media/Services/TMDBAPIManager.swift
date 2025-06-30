@@ -117,6 +117,61 @@ class TMDBAPIManager: ObservableObject {
         return response.results
     }
     
+    // MARK: - TV Show Search
+    func searchTVShows(query: String, page: Int = 1) async throws -> TMDBTVSearchResponse {
+        print("📺 TMDBAPIManager: Starting TV show search for query: '\(query)', page: \(page)")
+        
+        guard hasBearerToken else {
+            print("❌ TMDBAPIManager: Missing bearer token")
+            throw TMDBError.missingBearerToken
+        }
+        
+        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            print("⚠️ TMDBAPIManager: Empty query, returning empty results")
+            return TMDBTVSearchResponse(page: 1, results: [], totalPages: 0, totalResults: 0)
+        }
+        
+        let url = URL(string: getEndpoint("/search/tv"))!
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: true)!
+        let queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "query", value: query),
+            URLQueryItem(name: "include_adult", value: "false"),
+            URLQueryItem(name: "language", value: language),
+            URLQueryItem(name: "page", value: String(page))
+        ]
+        components.queryItems = queryItems
+        
+        guard let finalURL = components.url else {
+            throw TMDBError.invalidURL
+        }
+        
+        let request = createAuthenticatedRequest(for: finalURL)
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            if let httpResponse = response as? HTTPURLResponse {
+                guard httpResponse.statusCode == 200 else {
+                    throw TMDBError.networkError
+                }
+            }
+            
+            let searchResponse = try JSONDecoder().decode(TMDBTVSearchResponse.self, from: data)
+            print("✅ TMDBAPIManager: Successfully decoded TV show response with \(searchResponse.results.count) results")
+            
+            return searchResponse
+        } catch {
+            print("💥 TMDBAPIManager: TV show search failed with error: \(error)")
+            throw error
+        }
+    }
+    
+    // Convenience method for getting just the results
+    func searchTVShowResults(query: String, page: Int = 1) async throws -> [TMDBTVShowSearchResult] {
+        let response = try await searchTVShows(query: query, page: page)
+        return response.results
+    }
+    
     // MARK: - Get Movie Details
     func getMovie(id: Int) async throws -> TMDBMovieDetails {
         guard hasBearerToken else {
@@ -161,9 +216,80 @@ class TMDBAPIManager: ObservableObject {
         )
     }
     
+    // MARK: - Get TV Show Details
+    func getTVShow(id: Int) async throws -> TMDBTVShowDetails {
+        guard hasBearerToken else {
+            throw TMDBError.missingBearerToken
+        }
+        
+        let url = URL(string: getEndpoint("/tv/\(id)"))!
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: true)!
+        let queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "language", value: language)
+        ]
+        components.queryItems = components.queryItems.map { $0 + queryItems } ?? queryItems
+        
+        guard let finalURL = components.url else {
+            throw TMDBError.invalidURL
+        }
+        
+        let request = createAuthenticatedRequest(for: finalURL)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw TMDBError.networkError
+        }
+        
+        let tvShowDetails = try JSONDecoder().decode(TMDBTVShowDetails.self, from: data)
+        
+        // Fetch credits separately
+        let credits = try await getTVShowCredits(id: id)
+        
+        return TMDBTVShowDetails(
+            id: tvShowDetails.id,
+            name: tvShowDetails.name,
+            overview: tvShowDetails.overview,
+            firstAirDate: tvShowDetails.firstAirDate,
+            lastAirDate: tvShowDetails.lastAirDate,
+            numberOfSeasons: tvShowDetails.numberOfSeasons,
+            numberOfEpisodes: tvShowDetails.numberOfEpisodes,
+            genres: tvShowDetails.genres,
+            posterPath: tvShowDetails.posterPath,
+            backdropPath: tvShowDetails.backdropPath,
+            voteAverage: tvShowDetails.voteAverage,
+            status: tvShowDetails.status,
+            credits: credits
+        )
+    }
+    
     // MARK: - Get Movie Credits
     private func getMovieCredits(id: Int) async throws -> TMDBCredits {
         let url = URL(string: getEndpoint("/movie/\(id)/credits"))!
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: true)!
+        let queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "language", value: language)
+        ]
+        components.queryItems = components.queryItems.map { $0 + queryItems } ?? queryItems
+        
+        guard let finalURL = components.url else {
+            throw TMDBError.invalidURL
+        }
+        
+        let request = createAuthenticatedRequest(for: finalURL)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw TMDBError.networkError
+        }
+        
+        return try JSONDecoder().decode(TMDBCredits.self, from: data)
+    }
+    
+    // MARK: - Get TV Show Credits
+    private func getTVShowCredits(id: Int) async throws -> TMDBCredits {
+        let url = URL(string: getEndpoint("/tv/\(id)/credits"))!
         var components = URLComponents(url: url, resolvingAgainstBaseURL: true)!
         let queryItems: [URLQueryItem] = [
             URLQueryItem(name: "language", value: language)
@@ -198,6 +324,7 @@ class TMDBAPIManager: ObservableObject {
 
 // MARK: - Data Models
 
+// MARK: - Movie Models
 struct TMDBSearchResponse: Codable {
     let page: Int
     let results: [TMDBMovieSearchResult]
@@ -323,6 +450,142 @@ struct TMDBMovieDetails: Codable {
     }
 }
 
+// MARK: - TV Show Models
+struct TMDBTVSearchResponse: Codable {
+    let page: Int
+    let results: [TMDBTVShowSearchResult]
+    let totalPages: Int
+    let totalResults: Int
+    
+    private enum CodingKeys: String, CodingKey {
+        case page, results
+        case totalPages = "total_pages"
+        case totalResults = "total_results"
+    }
+}
+
+struct TMDBTVShowSearchResult: Codable, Identifiable {
+    let adult: Bool
+    let backdropPath: String?
+    let genreIds: [Int]
+    let id: Int
+    let originCountry: [String]
+    let originalLanguage: String
+    let originalName: String
+    let overview: String?
+    let popularity: Double
+    let posterPath: String?
+    let firstAirDate: String?
+    let name: String
+    let voteAverage: Double
+    let voteCount: Int
+    
+    private enum CodingKeys: String, CodingKey {
+        case adult, id, overview, popularity, name
+        case backdropPath = "backdrop_path"
+        case genreIds = "genre_ids"
+        case originCountry = "origin_country"
+        case originalLanguage = "original_language"
+        case originalName = "original_name"
+        case posterPath = "poster_path"
+        case firstAirDate = "first_air_date"
+        case voteAverage = "vote_average"
+        case voteCount = "vote_count"
+    }
+    
+    var year: Int? {
+        guard let firstAirDate = firstAirDate, !firstAirDate.isEmpty,
+              let date = DateFormatter.tmdbDateFormatter.date(from: firstAirDate) else {
+            return nil
+        }
+        return Calendar.current.component(.year, from: date)
+    }
+    
+    var thumbnailURL: URL? {
+        return TMDBAPIManager.shared.thumbnailURL(path: posterPath)
+    }
+    
+    var backdropURL: URL? {
+        return TMDBAPIManager.shared.imageURL(path: backdropPath)
+    }
+}
+
+struct TMDBTVShowDetails: Codable {
+    let id: Int
+    let name: String
+    let overview: String?
+    let firstAirDate: String?
+    let lastAirDate: String?
+    let numberOfSeasons: Int
+    let numberOfEpisodes: Int
+    let genres: [TMDBGenre]
+    let posterPath: String?
+    let backdropPath: String?
+    let voteAverage: Double
+    let status: String
+    var credits: TMDBCredits?
+    
+    private enum CodingKeys: String, CodingKey {
+        case id, name, overview, genres, status
+        case firstAirDate = "first_air_date"
+        case lastAirDate = "last_air_date"
+        case numberOfSeasons = "number_of_seasons"
+        case numberOfEpisodes = "number_of_episodes"
+        case posterPath = "poster_path"
+        case backdropPath = "backdrop_path"
+        case voteAverage = "vote_average"
+    }
+    
+    var firstAirYear: Int? {
+        guard let firstAirDate = firstAirDate,
+              let date = DateFormatter.tmdbDateFormatter.date(from: firstAirDate) else {
+            return nil
+        }
+        return Calendar.current.component(.year, from: date)
+    }
+    
+    var genreNames: String {
+        return genres.map { $0.name }.joined(separator: ", ")
+    }
+    
+    var posterURL: URL? {
+        return TMDBAPIManager.shared.imageURL(path: posterPath)
+    }
+    
+    var thumbnailURL: URL? {
+        return TMDBAPIManager.shared.thumbnailURL(path: posterPath)
+    }
+    
+    var creators: [TMDBCastMember] {
+        return credits?.crew.filter { $0.job == "Creator" || $0.job == "Executive Producer" } ?? []
+    }
+    
+    var cast: [TMDBCastMember] {
+        return credits?.cast ?? []
+    }
+    
+    // Convert to local TVShow model for saving
+    func toTVShow() -> TVShow {
+        return TVShow(
+            name: name,
+            year: firstAirYear,
+            tmdbRating: voteAverage,
+            posterPath: posterPath,
+            backdropPath: backdropPath,
+            genres: genreNames.isEmpty ? nil : genreNames,
+            overview: overview,
+            airDate: firstAirDate,
+            tmdbId: String(id),
+            creators: creators.map { $0.name }.joined(separator: ", "),
+            cast: cast.prefix(5).map { $0.name }.joined(separator: ", "),
+            status: status,
+            numberOfSeasons: numberOfSeasons,
+            numberOfEpisodes: numberOfEpisodes
+        )
+    }
+}
+
+// MARK: - Shared Models
 struct TMDBGenre: Codable {
     let id: Int
     let name: String

@@ -12,12 +12,21 @@ struct ContentView: View {
     
     @Environment(\.modelContext) private var modelContext
     @Query private var movies: [Movie]
+    @Query private var tvShows: [TVShow]
     @StateObject private var cloudKitManager = CloudKitManager.shared
     
-    @State private var showingCreateSheet = false
-    @State private var showingImportSheet = false
+    // Movie state
+    @State private var showingCreateMovieSheet = false
+    @State private var showingImportMovieSheet = false
     @State private var selectedMovie: Movie?
     @State private var showingMovieDetail = false
+    
+    // TV Show state
+    @State private var showingCreateTVShowSheet = false
+    @State private var showingImportTVShowSheet = false
+    @State private var selectedTVShow: TVShow?
+    @State private var showingTVShowDetail = false
+    
     @State private var selectedSidebarItem: SidebarItem? = .movies
 
     var body: some View {
@@ -74,15 +83,17 @@ struct ContentView: View {
                         movies: movies,
                         selectedMovie: $selectedMovie,
                         showingMovieDetail: $showingMovieDetail,
-                        showingCreateSheet: $showingCreateSheet,
-                        showingImportSheet: $showingImportSheet
+                        showingCreateSheet: $showingCreateMovieSheet,
+                        showingImportSheet: $showingImportMovieSheet
                     )
                 case .tvShows:
-                    ContentUnavailableView {
-                        Label("No TV Shows", systemImage: "tray.fill")
-                    } description: {
-                        Text("TV Shows feature is coming soon!")
-                    }
+                    TVShowsView(
+                        tvShows: tvShows,
+                        selectedTVShow: $selectedTVShow,
+                        showingTVShowDetail: $showingTVShowDetail,
+                        showingCreateSheet: $showingCreateTVShowSheet,
+                        showingImportSheet: $showingImportTVShowSheet
+                    )
                 case .comics:
                     ContentUnavailableView {
                         Label("No Comics", systemImage: "tray.fill")

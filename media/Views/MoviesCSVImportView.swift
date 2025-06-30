@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
 
-struct CSVImportView: View {
+struct MoviesCSVImportView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
@@ -539,8 +539,3 @@ enum CSVImportError: LocalizedError {
         }
     }
 }
-
-#Preview {
-    CSVImportView()
-        .modelContainer(for: Movie.self, inMemory: true)
-} 
