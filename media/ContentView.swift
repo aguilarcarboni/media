@@ -13,6 +13,8 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var movies: [Movie]
     @Query private var tvShows: [TVShow]
+    @Query private var games: [Game]
+    @Query private var books: [Book]
     @StateObject private var cloudKitManager = CloudKitManager.shared
     
     // Movie state
@@ -26,6 +28,16 @@ struct ContentView: View {
     @State private var showingImportTVShowSheet = false
     @State private var selectedTVShow: TVShow?
     @State private var showingTVShowDetail = false
+    
+    // Game state
+    @State private var showingCreateGameSheet = false
+    @State private var selectedGame: Game?
+    @State private var showingGameDetail = false
+    
+    // Book state
+    @State private var showingCreateBookSheet = false
+    @State private var selectedBook: Book?
+    @State private var showingBookDetail = false
     
     @State private var selectedSidebarItem: SidebarItem? = .movies
 
@@ -101,11 +113,19 @@ struct ContentView: View {
                         Text("Comics feature is coming soon!")
                     }
                 case .games:
-                    ContentUnavailableView {
-                        Label("No Games", systemImage: "tray.fill")
-                    } description: {
-                        Text("Games feature is coming soon!")
-                    }
+                    GamesView(
+                        games: games,
+                        selectedGame: $selectedGame,
+                        showingGameDetail: $showingGameDetail,
+                        showingCreateSheet: $showingCreateGameSheet
+                    )
+                case .books:
+                    BooksView(
+                        books: books,
+                        selectedBook: $selectedBook,
+                        showingBookDetail: $showingBookDetail,
+                        showingCreateSheet: $showingCreateBookSheet
+                    )
                 case .none:
                     VStack(spacing: 16) {
                         Image(systemName: "sidebar.left")
@@ -133,6 +153,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case tvShows = "TV Shows"
     case comics = "Comics"
     case games = "Games"
+    case books = "Books"
     
     var id: String { self.rawValue }
     
@@ -146,6 +167,8 @@ enum SidebarItem: String, CaseIterable, Identifiable {
             return "book"
         case .games:
             return "gamecontroller"
+        case .books:
+            return "book.closed"
         }
     }
 }

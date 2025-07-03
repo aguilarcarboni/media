@@ -14,6 +14,8 @@ struct mediaApp: App {
         let schema = Schema([
             Movie.self,
             TVShow.self,
+            Game.self,
+            Book.self,
         ])
         
         // Configure for CloudKit

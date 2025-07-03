@@ -12,7 +12,6 @@ struct CreateTVShowView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
-    @State private var selectedTab = 0
     @State private var showingPreview = false
     
     // TV Show data
@@ -54,19 +53,7 @@ struct CreateTVShowView: View {
     }
     
     private var mainView: some View {
-        TabView(selection: $selectedTab) {
-            manualEntryTab
-                .tabItem {
-                    Label("Manual Entry", systemImage: "pencil")
-                }
-                .tag(0)
-            
-            tmdbSearchTab
-                .tabItem {
-                    Label("Search TMDB", systemImage: "magnifyingglass")
-                }
-                .tag(1)
-        }
+        tmdbSearchTab
         .navigationTitle("Add TV Show")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
@@ -75,72 +62,6 @@ struct CreateTVShowView: View {
                 }
             }
         }
-    }
-    
-    private var manualEntryTab: some View {
-        VStack(spacing: 24) {
-            VStack(spacing: 16) {
-                TextField("TV Show Name", text: $name)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.title3)
-                
-                HStack(spacing: 12) {
-                    TextField("Year", text: $year)
-                        .textFieldStyle(.roundedBorder)
-                    
-                    TextField("Number of Seasons", text: $numberOfSeasons)
-                        .textFieldStyle(.roundedBorder)
-                }
-                
-                HStack(spacing: 12) {
-                    TextField("Genre", text: $genre)
-                        .textFieldStyle(.roundedBorder)
-                    
-                    TextField("Rating (0-10)", text: $rating)
-                        .textFieldStyle(.roundedBorder)
-                }
-                
-                HStack(spacing: 12) {
-                    TextField("Status", text: $status)
-                        .textFieldStyle(.roundedBorder)
-                    
-                    TextField("Episodes", text: $numberOfEpisodes)
-                        .textFieldStyle(.roundedBorder)
-                }
-                
-                TextField("Creators", text: $creators)
-                    .textFieldStyle(.roundedBorder)
-                
-                TextField("Main Cast", text: $cast)
-                    .textFieldStyle(.roundedBorder)
-                
-                TextField("Seasons (e.g., Season 1; Season 2)", text: $seasons)
-                    .textFieldStyle(.roundedBorder)
-                
-                TextField("Air Date (MM/DD/YYYY)", text: $airDate)
-                    .textFieldStyle(.roundedBorder)
-                
-                TextField("Overview or notes", text: $overview, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(4...8)
-            }
-            
-            Spacer()
-            
-            Button(action: {
-                showingPreview = true
-            }) {
-                Text("Continue to Preview")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray : Color.accentColor)
-                    .cornerRadius(12)
-            }
-            .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        }
-        .padding()
     }
     
     private var tmdbSearchTab: some View {

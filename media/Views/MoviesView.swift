@@ -93,6 +93,15 @@ struct MovieRowView: View {
     
     var body: some View {
         HStack {
+            AsyncImage(url: movie.thumbnailURL) { img in
+                img.resizable().aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Rectangle()
+                    .fill(.secondary.opacity(0.2))
+                    .overlay { Image(systemName: "photo") }
+            }
+            .frame(width: 40, height: 60)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading, spacing: 4) {
                 Text(movie.title)
                     .font(.headline)
