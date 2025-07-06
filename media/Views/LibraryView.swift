@@ -75,20 +75,6 @@ struct LibraryView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
-        .navigationDestination(for: SidebarItem.self) { item in
-            switch item {
-            case .movies:
-                MoviesView()
-            case .tvShows:
-                TVShowsView()
-            case .comics:
-                ComicsView()
-            case .games:
-                GamesView()
-            case .books:
-                BooksView()
-            }
-        }
         .cloudKitStatusAlert()
         .task {
             await cloudKitManager.checkCloudKitStatus()
