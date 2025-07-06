@@ -11,39 +11,43 @@ import SwiftData
 struct TVShowsView: View {
     @Query private var tvShows: [TVShow]
     @State private var selectedTVShow: TVShow?
-    @State private var showingCreateSheet = false
-    @State private var showingImportSheet = false
     @State private var searchQuery = ""
+    
+    // Filtering
+    enum FilterOption: String, CaseIterable, Identifiable {
+        case all = "All"
+        case watched = "Watched"
+        case unwatched = "Unwatched"
+
+        var id: Self { self }
+    }
+
+    @State private var filterOption: FilterOption = .all
+
+    private var filteredTVShows: [TVShow] {
+        tvShows
+            .filter { tvShow in
+                switch filterOption {
+                case .all:
+                    return true
+                case .watched:
+                    return tvShow.watched
+                case .unwatched:
+                    return !tvShow.watched
+                }
+            }
+            .filter { tvShow in
+                searchQuery.isEmpty || tvShow.name.localizedCaseInsensitiveContains(searchQuery)
+            }
+    }
     
     var body: some View {
         VStack(spacing: 0) {
             if tvShows.isEmpty {
-                VStack(spacing: 16) {
-                    Image(systemName: "tv")
-                        .font(.system(size: 48))
-                        .foregroundStyle(.secondary)
-                    
-                    VStack(spacing: 8) {
-                        Text("No TV Shows Yet")
-                            .font(.title2)
-                            .bold()
-                        
-                        Text("Add your first TV show to get started")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    
-                    Button(action: { showingCreateSheet = true }) {
-                        Label("Add TV Show", systemImage: "plus")
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-                .padding()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ContentUnavailableView("No TV Shows", systemImage: "tv", description: Text("Add a TV Show"))
             } else {
                 List {
-                    ForEach(tvShows) { tvShow in
+                    ForEach(filteredTVShows) { tvShow in
                         TVShowRowView(tvShow: tvShow)
                             .contentShape(Rectangle())
                             .onTapGesture { selectedTVShow = tvShow }
@@ -53,33 +57,26 @@ struct TVShowsView: View {
             }
         }
         .navigationTitle("TV Shows")
-        .sheet(isPresented: $showingCreateSheet) {
-            CreateTVShowView()
-        }
-        .sheet(isPresented: $showingImportSheet) {
-            TVShowsCSVImportView()
-        }
         .sheet(item: $selectedTVShow) { tvShow in
             NavigationStack {
                 TVShowView(tvShow: tvShow)
                     .navigationTitle(tvShow.name)
             }
         }
+        .searchable(text: $searchQuery)
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button(action: { showingImportSheet = true }) {
-                    Label("Import CSV", systemImage: "doc.text")
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Picker("Filter", selection: $filterOption) {
+                        ForEach(FilterOption.allCases) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
                 }
-                .help("Import TV shows from CSV file")
-                
-                Button(action: { showingCreateSheet = true }) {
-                    Label("Add TV Show", systemImage: "plus")
-                }
-                .help("Add new TV show")
-                .keyboardShortcut("n", modifiers: .command)
             }
         }
-        .searchable(text: $searchQuery)
     }
 }
 

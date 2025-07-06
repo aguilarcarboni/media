@@ -14,6 +14,18 @@ struct TVShowView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
+    // Toolbar state
+    @State private var showingDeleteAlert: Bool = false
+    @State private var tempRating: Double
+    
+    // Custom initializer to configure state values
+    init(tvShow: TVShow, isPreview: Bool = false) {
+        self._tvShow = Bindable(wrappedValue: tvShow)
+        self.isPreview = isPreview
+        // Start rating at personal rating if available, then TMDB rating, else 0.5
+        _tempRating = State(initialValue: tvShow.rating ?? tvShow.tmdbRating ?? 0.5)
+    }
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -260,6 +272,17 @@ struct TVShowView: View {
                     }
                 }
             } else {
+                // Delete TV show toolbar button
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(role: .destructive) {
+                        showingDeleteAlert = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .tint(.red)
+                }
+
+                // Watched / Unwatched toggle
                 ToolbarItem() {
                     Button {
                         if tvShow.watched { tvShow.markAsUnwatched() } else { tvShow.markAsWatched() }
@@ -267,6 +290,25 @@ struct TVShowView: View {
                         Image(systemName: tvShow.watched ? "checkmark.circle.fill" : "circle")
                     }
                 }
+
+                // Rating menu (only when watched)
+                if tvShow.watched {
+                    ToolbarItem {
+                        Menu {
+                            Stepper(value: $tempRating, in: 0...10, step: 0.1) {
+                                Text(String(format: "%.0f%%", tempRating * 10))
+                            }
+                            Button("Save") {
+                                tvShow.rating = tempRating
+                                tvShow.updated = Date()
+                            }
+                        } label: {
+                            Image(systemName: tvShow.rating != nil ? "star.circle.fill" : "star.circle")
+                        }
+                    }
+                }
+
+                // Overflow menu
                 ToolbarItem() {
                     Menu {
                         if tvShow.tmdbId != nil {
@@ -275,6 +317,16 @@ struct TVShowView: View {
                     } label: { Image(systemName: "ellipsis") }
                 }
             }
+        }
+        // Delete confirmation alert
+        .alert("Delete TV Show?", isPresented: $showingDeleteAlert) {
+            Button("Delete", role: .destructive) {
+                modelContext.delete(tvShow)
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This action cannot be undone.")
         }
     }
     

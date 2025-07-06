@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     enum Tabs: Hashable {
-        case search     // <- new search role
+        case search
         case library
         case explore
     }
