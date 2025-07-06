@@ -51,11 +51,7 @@ struct CreateGameView: View {
             // Search bar
             VStack(spacing: 16) {
                 HStack {
-                    TextField("Search for a game...", text: $searchQuery)
-                        .textFieldStyle(.roundedBorder)
-                        .onSubmit {
-                            searchGames()
-                        }
+                    TextField("Search for a game...", text: $searchQuery).onSubmit { searchGames() }.textFieldStyle(.plain)
                     Button(action: searchGames) {
                         if isSearching {
                             ProgressView()

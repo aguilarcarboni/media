@@ -9,10 +9,10 @@ import SwiftUI
 import SwiftData
 
 struct GamesView: View {
-    let games: [Game]
-    @Binding var selectedGame: Game?
-    @Binding var showingGameDetail: Bool
-    @Binding var showingCreateSheet: Bool
+    @Query private var games: [Game]
+    @State private var selectedGame: Game?
+    @State private var showingCreateSheet = false
+    @State private var searchQuery = ""
     
     var body: some View {
         VStack(spacing: 0) {
@@ -38,26 +38,20 @@ struct GamesView: View {
             } else {
                 List {
                     ForEach(games) { game in
-                        Button(action: {
-                            selectedGame = game
-                            showingGameDetail = true
-                        }) {
-                            GameRowView(game: game)
-                        }
-                        .buttonStyle(.plain)
+                        GameRowView(game: game)
+                            .contentShape(Rectangle())
+                            .onTapGesture { selectedGame = game }
                     }
                 }
                 .listStyle(.plain)
             }
         }
-        .navigationTitle("Games (\(games.count))")
+        .navigationTitle("Games")
         .sheet(isPresented: $showingCreateSheet) {
             CreateGameView()
         }
-        .sheet(isPresented: $showingGameDetail) {
-            if let selectedGame = selectedGame {
-                NavigationStack { GameView(game: selectedGame).navigationTitle(selectedGame.name) }
-            }
+        .sheet(item: $selectedGame) { game in
+            NavigationStack { GameView(game: game).navigationTitle(game.name) }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -68,11 +62,12 @@ struct GamesView: View {
                 .keyboardShortcut("n", modifiers: .command)
             }
         }
+        .searchable(text: $searchQuery)
     }
 }
 
 struct GameRowView: View {
-    let game: Game
+    @Bindable var game: Game
     var body: some View {
         HStack {
             AsyncImage(url: game.thumbnailURL) { img in
@@ -85,23 +80,32 @@ struct GameRowView: View {
             .frame(width: 40, height: 60)
             .clipShape(RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading, spacing: 4) {
-                Text(game.name).font(.headline).strikethrough(game.played)
+                Text(game.name)
+                    .font(.headline)
                 HStack {
                     if let year = game.year {
-                        Text("\(year)").font(.caption).foregroundStyle(.secondary)
+                        Text(String(year)).font(.caption).foregroundStyle(.secondary)
                     }
                     if !game.platformList.isEmpty {
-                        Text("• \(game.platformList.joined(separator: ", "))").font(.caption).foregroundStyle(.secondary)
+                        Text("\(game.platformList.joined(separator: ", "))").font(.caption).foregroundStyle(.secondary)
                     }
                     if let rating = game.displayRating {
-                        Text("• ⭐ \(rating, specifier: "%.1f")").font(.caption).foregroundStyle(.secondary)
+                        Text("\(rating, specifier: "%.1f")").font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
             Spacer()
-            if game.played {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            Button(action: {
+                if game.played {
+                    game.markAsUnplayed()
+                } else {
+                    game.markAsPlayed()
+                }
+            }) {
+                Image(systemName: game.played ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(game.played ? .green : .secondary)
             }
+            .buttonStyle(.borderless)
         }
     }
 } 

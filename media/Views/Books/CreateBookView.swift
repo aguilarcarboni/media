@@ -41,7 +41,7 @@ struct CreateBookView: View {
         VStack(spacing: 20) {
             VStack(spacing: 16) {
                 HStack {
-                    TextField("Search for a book...", text: $searchQuery).textFieldStyle(.roundedBorder).onSubmit { searchBooks() }
+                    TextField("Search for a book...", text: $searchQuery).onSubmit { searchBooks() }.textFieldStyle(.plain)
                     Button(action: searchBooks) {
                         if isSearching { ProgressView().scaleEffect(0.8) } else { Image(systemName: "magnifyingglass").foregroundColor(.accentColor) }
                     }.disabled(isSearching || searchQuery.trimmingCharacters(in: .whitespaces).isEmpty).buttonStyle(.bordered)

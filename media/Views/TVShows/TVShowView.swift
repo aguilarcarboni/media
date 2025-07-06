@@ -10,62 +10,13 @@ import SwiftData
 
 struct TVShowView: View {
     @Bindable var tvShow: TVShow
+    var isPreview: Bool = false
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // Header with backdrop
-                ZStack(alignment: .bottomLeading) {
-                    // Backdrop image
-                    AsyncImage(url: tvShow.backdropURL) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Rectangle()
-                            .fill(.secondary.opacity(0.3))
-                            .overlay {
-                                Image(systemName: "tv")
-                                    .font(.system(size: 48))
-                                    .foregroundStyle(.secondary)
-                            }
-                    }
-                    .frame(height: 200)
-                    .clipped()
-                    
-                    // Gradient overlay
-                    LinearGradient(
-                        colors: [.clear, .black.opacity(0.7)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    
-                    // Title overlay
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tvShow.name)
-                            .font(.largeTitle)
-                            .bold()
-                            .foregroundStyle(.white)
-                            .shadow(color: .black, radius: 2)
-                        
-                        HStack {
-                            if let year = tvShow.year {
-                                Text("\(year)")
-                                    .font(.title3)
-                                    .foregroundStyle(.white.opacity(0.9))
-                            }
-                            
-                            if let rating = tvShow.displayRating {
-                                Text("⭐ \(rating, specifier: "%.1f")")
-                                    .font(.title3)
-                                    .foregroundStyle(.white.opacity(0.9))
-                            }
-                        }
-                    }
-                    .padding()
-                }
-                .cornerRadius(12)
                 
                 HStack(alignment: .top, spacing: 16) {
                     // Poster
@@ -152,7 +103,7 @@ struct TVShowView: View {
                     }
                     .padding()
                     .background(.regularMaterial)
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 
                 // Seasons
@@ -170,13 +121,13 @@ struct TVShowView: View {
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
                                     .background(.regularMaterial)
-                                    .cornerRadius(6)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
                             }
                         }
                     }
                     .padding()
                     .background(.regularMaterial)
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 
                 // Cast and Crew
@@ -205,9 +156,10 @@ struct TVShowView: View {
                             }
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
                     .background(.regularMaterial)
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: 8)) 
                 }
                 
                 // Additional Details
@@ -239,43 +191,88 @@ struct TVShowView: View {
                             }
                         }
                         
-                        if tvShow.rating != nil && tvShow.tmdbRating != nil {
+                        if let userRating = tvShow.rating {
                             HStack {
                                 Text("Your Rating:")
                                 Spacer()
-                                Text("⭐ \(tvShow.rating!, specifier: "%.1f")")
+                                Text("⭐ \(userRating, specifier: "%.1f")")
                             }
-                            
+                        }
+
+                        if let apiRating = tvShow.tmdbRating {
                             HStack {
                                 Text("TMDB Rating:")
                                 Spacer()
-                                Text("⭐ \(tvShow.tmdbRating!, specifier: "%.1f")")
+                                Text("⭐ \(apiRating, specifier: "%.1f")")
+                            }
+                        }
+
+                        if let seasons = tvShow.numberOfSeasons {
+                            HStack {
+                                Text("Seasons:")
+                                Spacer()
+                                Text("\(seasons)")
+                            }
+                        }
+
+                        if let episodes = tvShow.numberOfEpisodes {
+                            HStack {
+                                Text("Episodes:")
+                                Spacer()
+                                Text("\(episodes)")
                             }
                         }
                     }
                 }
                 .padding()
                 .background(.regularMaterial)
-                .cornerRadius(8)
-                
-                Spacer()
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                // Backdrop
+                ZStack(alignment: .bottomLeading) {
+                    AsyncImage(url: tvShow.backdropURL) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Rectangle()
+                            .fill(.secondary.opacity(0.3))
+                            .overlay {
+                                Image(systemName: "tv")
+                                    .font(.system(size: 48))
+                                    .foregroundStyle(.secondary)
+                            }
+                    }
+                    .frame(height: 200)
+                    .clipped()
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             .padding()
         }
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                if let tmdbId = tvShow.tmdbId {
-                    Button("Refresh from TMDB") {
-                        refreshFromTMDB()
+            if isPreview {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        modelContext.insert(tvShow)
+                        dismiss()
                     }
                 }
-                
-                Button(tvShow.watched ? "Mark Unwatched" : "Mark Watched") {
-                    if tvShow.watched {
-                        tvShow.markAsUnwatched()
-                    } else {
-                        tvShow.markAsWatched()
+            } else {
+                ToolbarItem() {
+                    Button {
+                        if tvShow.watched { tvShow.markAsUnwatched() } else { tvShow.markAsWatched() }
+                    } label: {
+                        Image(systemName: tvShow.watched ? "checkmark.circle.fill" : "circle")
                     }
+                }
+                ToolbarItem() {
+                    Menu {
+                        if tvShow.tmdbId != nil {
+                            Button("Refresh from TMDB") { refreshFromTMDB() }
+                        }
+                    } label: { Image(systemName: "ellipsis") }
                 }
             }
         }

@@ -9,10 +9,10 @@ import SwiftUI
 import SwiftData
 
 struct BooksView: View {
-    let books: [Book]
-    @Binding var selectedBook: Book?
-    @Binding var showingBookDetail: Bool
-    @Binding var showingCreateSheet: Bool
+    @Query private var books: [Book]
+    @State private var selectedBook: Book?
+    @State private var showingCreateSheet = false
+    @State private var searchQuery = ""
     
     var body: some View {
         VStack(spacing: 0) {
@@ -38,24 +38,18 @@ struct BooksView: View {
             } else {
                 List {
                     ForEach(books) { book in
-                        Button(action: {
-                            selectedBook = book
-                            showingBookDetail = true
-                        }) {
-                            BookRowView(book: book)
-                        }
-                        .buttonStyle(.plain)
+                        BookRowView(book: book)
+                            .contentShape(Rectangle())
+                            .onTapGesture { selectedBook = book }
                     }
                 }
                 .listStyle(.plain)
             }
         }
-        .navigationTitle("Books (\(books.count))")
+        .navigationTitle("Books")
         .sheet(isPresented: $showingCreateSheet) { CreateBookView() }
-        .sheet(isPresented: $showingBookDetail) {
-            if let selectedBook = selectedBook {
-                NavigationStack { BookView(book: selectedBook).navigationTitle(selectedBook.title) }
-            }
+        .sheet(item: $selectedBook) { book in
+            NavigationStack { BookView(book: book).navigationTitle(book.title) }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -66,11 +60,12 @@ struct BooksView: View {
                 .keyboardShortcut("n", modifiers: .command)
             }
         }
+        .searchable(text: $searchQuery)
     }
 }
 
 struct BookRowView: View {
-    let book: Book
+    @Bindable var book: Book
     var body: some View {
         HStack {
             AsyncImage(url: book.coverURL) { img in
@@ -80,17 +75,28 @@ struct BookRowView: View {
             }
             .frame(width: 40, height: 60).clipShape(RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading, spacing: 4) {
-                Text(book.title).font(.headline).strikethrough(book.read)
-                Text(book.author).font(.caption).foregroundStyle(.secondary)
+                Text(book.title)
+                    .font(.headline)
+                Text(book.author)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 HStack {
-                    if let year = book.year { Text("\(year)").font(.caption).foregroundStyle(.secondary) }
-                    if let rating = book.displayRating { Text("• ⭐ \(rating, specifier: "%.1f")").font(.caption).foregroundStyle(.secondary) }
+                    if let year = book.year { Text(String(year)).font(.caption).foregroundStyle(.secondary) }
+                    if let rating = book.displayRating { Text("⭐ \(rating, specifier: "%.1f")").font(.caption).foregroundStyle(.secondary) }
                 }
             }
             Spacer()
-            if book.read {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            Button(action: {
+                if book.read {
+                    book.markAsUnread()
+                } else {
+                    book.markAsRead()
+                }
+            }) {
+                Image(systemName: book.read ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(book.read ? .green : .secondary)
             }
+            .buttonStyle(.borderless)
         }
     }
 } 

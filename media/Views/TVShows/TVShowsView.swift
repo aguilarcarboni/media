@@ -1,5 +1,5 @@
 //
-//  MoviesView.swift
+//  TVShowsView.swift
 //  media
 //
 //  Created by Andrés on 28/6/2025.
@@ -8,34 +8,34 @@
 import SwiftUI
 import SwiftData
 
-struct MoviesView: View {
-    let movies: [Movie]
-    @Binding var selectedMovie: Movie?
-    @Binding var showingMovieDetail: Bool
-    @Binding var showingCreateSheet: Bool
-    @Binding var showingImportSheet: Bool
+struct TVShowsView: View {
+    @Query private var tvShows: [TVShow]
+    @State private var selectedTVShow: TVShow?
+    @State private var showingCreateSheet = false
+    @State private var showingImportSheet = false
+    @State private var searchQuery = ""
     
     var body: some View {
         VStack(spacing: 0) {
-            if movies.isEmpty {
+            if tvShows.isEmpty {
                 VStack(spacing: 16) {
-                    Image(systemName: "film")
+                    Image(systemName: "tv")
                         .font(.system(size: 48))
                         .foregroundStyle(.secondary)
                     
                     VStack(spacing: 8) {
-                        Text("No Movies Yet")
+                        Text("No TV Shows Yet")
                             .font(.title2)
                             .bold()
                         
-                        Text("Add your first movie to get started")
+                        Text("Add your first TV show to get started")
                             .font(.body)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                     }
                     
                     Button(action: { showingCreateSheet = true }) {
-                        Label("Add Movie", systemImage: "plus")
+                        Label("Add TV Show", systemImage: "plus")
                     }
                     .buttonStyle(.borderedProminent)
                 }
@@ -43,32 +43,26 @@ struct MoviesView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
-                    ForEach(movies) { movie in
-                        Button(action: {
-                            selectedMovie = movie
-                            showingMovieDetail = true
-                        }) {
-                            MovieRowView(movie: movie)
-                        }
-                        .buttonStyle(.plain)
+                    ForEach(tvShows) { tvShow in
+                        TVShowRowView(tvShow: tvShow)
+                            .contentShape(Rectangle())
+                            .onTapGesture { selectedTVShow = tvShow }
                     }
                 }
                 .listStyle(.plain)
             }
         }
-        .navigationTitle("Movies (\(movies.count))")
+        .navigationTitle("TV Shows")
         .sheet(isPresented: $showingCreateSheet) {
-            CreateMovieView()
+            CreateTVShowView()
         }
         .sheet(isPresented: $showingImportSheet) {
-            MoviesCSVImportView()
+            TVShowsCSVImportView()
         }
-        .sheet(isPresented: $showingMovieDetail) {
-            if let selectedMovie = selectedMovie {
-                NavigationStack {
-                    MovieView(movie: selectedMovie)
-                        .navigationTitle(selectedMovie.title)
-                }
+        .sheet(item: $selectedTVShow) { tvShow in
+            NavigationStack {
+                TVShowView(tvShow: tvShow)
+                    .navigationTitle(tvShow.name)
             }
         }
         .toolbar {
@@ -76,24 +70,25 @@ struct MoviesView: View {
                 Button(action: { showingImportSheet = true }) {
                     Label("Import CSV", systemImage: "doc.text")
                 }
-                .help("Import items from CSV file")
+                .help("Import TV shows from CSV file")
                 
                 Button(action: { showingCreateSheet = true }) {
-                    Label("Add Item", systemImage: "plus")
+                    Label("Add TV Show", systemImage: "plus")
                 }
-                .help("Add new movie")
+                .help("Add new TV show")
                 .keyboardShortcut("n", modifiers: .command)
             }
         }
+        .searchable(text: $searchQuery)
     }
 }
 
-struct MovieRowView: View {
-    let movie: Movie
+struct TVShowRowView: View {
+    @Bindable var tvShow: TVShow
     
     var body: some View {
         HStack {
-            AsyncImage(url: movie.thumbnailURL) { img in
+            AsyncImage(url: tvShow.thumbnailURL) { img in
                 img.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
                 Rectangle()
@@ -103,25 +98,30 @@ struct MovieRowView: View {
             .frame(width: 40, height: 60)
             .clipShape(RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading, spacing: 4) {
-                Text(movie.title)
+                Text(tvShow.name)
                     .font(.headline)
-                    .strikethrough(movie.watched)
                 
                 HStack {
-                    if let year = movie.year {
-                        Text("\(year)")
+                    if let year = tvShow.year {
+                        Text(String(year))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     
-                    if let genres = movie.genres {
-                        Text("• \(genres)")
+                    if let genres = tvShow.genres {
+                        Text("\(genres)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     
-                    if let rating = movie.displayRating {
-                        Text("• ⭐ \(rating, specifier: "%.1f")")
+                    if let rating = tvShow.displayRating {
+                        Text("\(rating, specifier: "%.1f")")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    if let numberOfSeasons = tvShow.numberOfSeasons {
+                        Text("\(numberOfSeasons) season\(numberOfSeasons == 1 ? "" : "s")")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -130,10 +130,17 @@ struct MovieRowView: View {
             
             Spacer()
             
-            if movie.watched {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+            Button(action: {
+                if tvShow.watched {
+                    tvShow.markAsUnwatched()
+                } else {
+                    tvShow.markAsWatched()
+                }
+            }) {
+                Image(systemName: tvShow.watched ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(tvShow.watched ? .green : .secondary)
             }
+            .buttonStyle(.borderless)
         }
     }
-}
+} 
