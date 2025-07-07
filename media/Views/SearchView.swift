@@ -53,58 +53,108 @@ struct SearchView: View {
     @State private var presentingSavedGame: Game?
     @State private var savedGameIDs: Set<String> = []
     @State private var savedGamesByID: [String: Game] = [:]
+    // Search mode (Media APIs or on-device Library)
+    private enum Mode: String, CaseIterable, Identifiable {
+        case media = "Media"
+        case library = "Library"
+        var id: Self { self }
+    }
+    // Current search mode
+    @State private var selectedMode: Mode = .media
+    // Local library search results
+    @State private var ownedMovieResults: [Movie] = []
+    @State private var ownedTVResults: [TVShow] = []
+    @State private var ownedBookResults: [Book] = []
+    @State private var ownedGameResults: [Game] = []
 
     var body: some View {
         NavigationStack {
-            Group {
-                let hasAnyResults = !movieResults.isEmpty || !tvResults.isEmpty || !bookResults.isEmpty || !gameResults.isEmpty
-                if isSearching {
-                    ProgressView("Searching databases...")
-                } else if hasSearched {
-                    if !hasAnyResults {
-                        VStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 32))
-                                .foregroundStyle(.secondary)
-                            Text("No results for \"\(searchQuery)\"")
-                                .font(.headline)
-                                .foregroundStyle(.secondary)
+            VStack {
+                Picker("Source", selection: $selectedMode) {
+                    ForEach(Mode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+
+                Group {
+                    let hasAnyResults: Bool = {
+                        if selectedMode == .media {
+                            return !movieResults.isEmpty || !tvResults.isEmpty || !bookResults.isEmpty || !gameResults.isEmpty
+                        } else {
+                            return !ownedMovieResults.isEmpty || !ownedTVResults.isEmpty || !ownedBookResults.isEmpty || !ownedGameResults.isEmpty
+                        }
+                    }()
+
+                    if isSearching {
+                        ProgressView(selectedMode == .media ? "Searching databases…" : "Searching library…")
+                    } else if hasSearched {
+                        if !hasAnyResults {
+                            VStack(spacing: 8) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(.secondary)
+                                Text("No results for \"\(searchQuery)\"")
+                                    .font(.headline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else {
+                            ScrollView {
+                                LazyVStack(spacing: 12) {
+                                    if selectedCategories.contains(.movies) {
+                                        if selectedMode == .media {
+                                            ForEach(movieResults) { movieSearchResultRow($0, isSaved: savedMovieIDs.contains(String($0.id))) }
+                                        } else {
+                                            ForEach(ownedMovieResults) { libraryMovieRow($0) }
+                                        }
+                                    }
+                                    if selectedCategories.contains(.tv) {
+                                        if selectedMode == .media {
+                                            ForEach(tvResults) { tvShowSearchResultRow($0, isSaved: savedTVIDs.contains(String($0.id))) }
+                                        } else {
+                                            ForEach(ownedTVResults) { libraryTVShowRow($0) }
+                                        }
+                                    }
+                                    if selectedCategories.contains(.books) {
+                                        if selectedMode == .media {
+                                            ForEach(bookResults) { bookSearchResultRow($0, isSaved: savedBookIDs.contains(String($0.trackId))) }
+                                        } else {
+                                            ForEach(ownedBookResults) { libraryBookRow($0) }
+                                        }
+                                    }
+                                    if selectedCategories.contains(.games) {
+                                        if selectedMode == .media {
+                                            ForEach(gameResults) { gameSearchResultRow($0, isSaved: savedGameIDs.contains(String($0.id))) }
+                                        } else {
+                                            ForEach(ownedGameResults) { libraryGameRow($0) }
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
                         }
                     } else {
-                        ScrollView {
-                            LazyVStack(spacing: 12) {
-                                if selectedCategories.contains(.movies) {
-                                    ForEach(movieResults) { movieSearchResultRow($0, isSaved: savedMovieIDs.contains(String($0.id))) }
-                                }
-                                if selectedCategories.contains(.tv) {
-                                    ForEach(tvResults) { tvShowSearchResultRow($0, isSaved: savedTVIDs.contains(String($0.id))) }
-                                }
-                                if selectedCategories.contains(.books) {
-                                    ForEach(bookResults) { bookSearchResultRow($0, isSaved: savedBookIDs.contains(String($0.trackId))) }
-                                }
-                                if selectedCategories.contains(.games) {
-                                    ForEach(gameResults) { gameSearchResultRow($0, isSaved: savedGameIDs.contains(String($0.id))) }
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
+                        ContentUnavailableView("Search", systemImage: "magnifyingglass", description: Text(searchQuery.isEmpty ? "Start typing to search your media library…" : "Press enter to search…"))
                     }
-                } else {
-                    ContentUnavailableView("Search", systemImage: "magnifyingglass", description: Text(searchQuery.isEmpty ? "Start typing to search your media library…" : "Press enter to search…"))
                 }
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         ForEach(Category.allCases) { cat in
-                            Button(action: {
-                                if selectedCategories.contains(cat) {
-                                    selectedCategories.remove(cat)
-                                } else {
-                                    selectedCategories.insert(cat)
-                                }
-                            }) {
-                                Label(cat.rawValue, systemImage: selectedCategories.contains(cat) ? "checkmark" : "")
+                            Toggle(
+                                isOn: Binding<Bool>(
+                                    get: { selectedCategories.contains(cat) },
+                                    set: { isOn in
+                                        if isOn {
+                                            selectedCategories.insert(cat)
+                                        } else {
+                                            selectedCategories.remove(cat)
+                                        }
+                                    })
+                            ) {
+                                Text(cat.rawValue)
                             }
                         }
                     } label: {
@@ -115,7 +165,11 @@ struct SearchView: View {
             .navigationTitle("Search")
             .searchable(text: $searchQuery, prompt: "Search Media")
             .onSubmit(of: .search) {
-                Task { await performSearch() }
+                if selectedMode == .media {
+                    Task { await performSearch() }
+                } else {
+                    performLocalSearch()
+                }
             }
             .onChange(of: searchQuery) { _ in
                 hasSearched = false
@@ -123,6 +177,10 @@ struct SearchView: View {
                 tvResults = []
                 bookResults = []
                 gameResults = []
+                ownedMovieResults = []
+                ownedTVResults = []
+                ownedBookResults = []
+                ownedGameResults = []
             }
             // Preview sheet
             .sheet(isPresented: $showingPreview, onDismiss: refreshSavedCache) {
@@ -427,6 +485,98 @@ struct SearchView: View {
         var gDict: [String: Game] = [:]
         for g in existingGames { if let id = g.igdbId { gDict[id] = g } }
         savedGamesByID = gDict
+    }
+
+    // MARK: – Library Helpers
+    private func libraryMovieRow(_ movie: Movie) -> some View {
+        Button(action: { presentingSavedMovie = movie }) {
+            searchRowThumbnail(url: movie.thumbnailURL, title: movie.title, subtitle: subtitleOwnedMovie(movie), trailingIcon: "chevron.right", iconColor: .secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func libraryTVShowRow(_ show: TVShow) -> some View {
+        Button(action: { presentingSavedTVShow = show }) {
+            searchRowThumbnail(url: show.thumbnailURL, title: show.name, subtitle: subtitleOwnedTV(show), trailingIcon: "chevron.right", iconColor: .secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func libraryBookRow(_ book: Book) -> some View {
+        Button(action: { presentingSavedBook = book }) {
+            searchRowThumbnail(url: book.coverURL, title: book.title, subtitle: subtitleOwnedBook(book), trailingIcon: "chevron.right", iconColor: .secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func libraryGameRow(_ game: Game) -> some View {
+        Button(action: { presentingSavedGame = game }) {
+            searchRowThumbnail(url: game.thumbnailURL, title: game.name, subtitle: subtitleOwnedGame(game), trailingIcon: "chevron.right", iconColor: .secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func subtitleOwnedMovie(_ movie: Movie) -> String {
+        var parts: [String] = ["Movie"]
+        if let year = movie.year { parts.append(String(year)) }
+        return parts.joined(separator: " • ")
+    }
+
+    private func subtitleOwnedTV(_ show: TVShow) -> String {
+        var parts: [String] = ["TV Show"]
+        if let year = show.year { parts.append(String(year)) }
+        return parts.joined(separator: " • ")
+    }
+
+    private func subtitleOwnedBook(_ book: Book) -> String {
+        var parts: [String] = ["Book"]
+        if let year = book.year { parts.append(String(year)) }
+        return parts.joined(separator: " • ")
+    }
+
+    private func subtitleOwnedGame(_ game: Game) -> String {
+        var parts: [String] = ["Game"]
+        if let year = game.year { parts.append(String(year)) }
+        return parts.joined(separator: " • ")
+    }
+
+    // MARK: – Local Search
+    private func performLocalSearch() {
+        let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        isSearching = true
+        defer {
+            isSearching = false
+            hasSearched = true
+        }
+
+        if selectedCategories.contains(.movies) {
+            let all = (try? modelContext.fetch(FetchDescriptor<Movie>())) ?? []
+            ownedMovieResults = all.filter { $0.title.localizedCaseInsensitiveContains(trimmed) }
+        } else {
+            ownedMovieResults = []
+        }
+
+        if selectedCategories.contains(.tv) {
+            let all = (try? modelContext.fetch(FetchDescriptor<TVShow>())) ?? []
+            ownedTVResults = all.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
+        } else {
+            ownedTVResults = []
+        }
+
+        if selectedCategories.contains(.books) {
+            let all = (try? modelContext.fetch(FetchDescriptor<Book>())) ?? []
+            ownedBookResults = all.filter { $0.title.localizedCaseInsensitiveContains(trimmed) || $0.author.localizedCaseInsensitiveContains(trimmed) }
+        } else {
+            ownedBookResults = []
+        }
+
+        if selectedCategories.contains(.games) {
+            let all = (try? modelContext.fetch(FetchDescriptor<Game>())) ?? []
+            ownedGameResults = all.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
+        } else {
+            ownedGameResults = []
+        }
     }
 }
 

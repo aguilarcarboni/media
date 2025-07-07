@@ -22,6 +22,18 @@ struct BooksView: View {
     
     @State private var filterOption: FilterOption = .all
     
+    // Sorting
+    enum SortOption: String, CaseIterable, Identifiable {
+        case titleAZ = "Title A-Z"
+        case titleZA = "Title Z-A"
+        case yearNewest = "Year Newest"
+        case yearOldest = "Year Oldest"
+
+        var id: Self { self }
+    }
+
+    @State private var sortOption: SortOption = .titleAZ
+    
     private var filteredBooks: [Book] {
         books
             .filter { book in
@@ -35,6 +47,18 @@ struct BooksView: View {
                 searchQuery.isEmpty ||
                 bk.title.localizedCaseInsensitiveContains(searchQuery) ||
                 bk.author.localizedCaseInsensitiveContains(searchQuery)
+            }
+            .sorted { lhs, rhs in
+                switch sortOption {
+                case .titleAZ:
+                    return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+                case .titleZA:
+                    return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedDescending
+                case .yearNewest:
+                    return (lhs.year ?? 0) > (rhs.year ?? 0)
+                case .yearOldest:
+                    return (lhs.year ?? 0) < (rhs.year ?? 0)
+                }
             }
     }
     
@@ -81,6 +105,17 @@ struct BooksView: View {
                     }
                 } label: {
                     Image(systemName: "line.3.horizontal.decrease.circle")
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Picker("Sort", selection: $sortOption) {
+                        ForEach(SortOption.allCases) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
                 }
             }
         }
