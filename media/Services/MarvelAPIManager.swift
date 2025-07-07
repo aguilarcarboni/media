@@ -23,15 +23,15 @@ class MarvelAPIManager: ObservableObject {
     
     // MARK: - Authentication Helpers
     private func authQueryItems() -> [URLQueryItem] {
-        // Marvel recommends an arbitrary changing string; using integer Unix time keeps it simple
-        let ts = String(Int(Date().timeIntervalSince1970))
-        let hashInput = ts + privateKey + publicKey
-        let digest = Insecure.MD5.hash(data: Data(hashInput.utf8))
-        let hash = digest.map { String(format: "%02hhx", $0) }.joined()
+        // Marvel requires timestamp (ts) and MD5 hash of ts+privateKey+publicKey for every request.
+        // We use millisecond precision for the timestamp to reduce the chance of collisions.
+        let timestamp = Date().currentTimeInMillis()
+        let ts = String(timestamp)
+        let hash = (ts + privateKey + publicKey).md5Value
         print("🔐 ts=\(ts)  hash=\(hash)")
         return [
-            URLQueryItem(name: "ts", value: ts),
             URLQueryItem(name: "apikey", value: publicKey),
+            URLQueryItem(name: "ts", value: ts),
             URLQueryItem(name: "hash", value: hash)
         ]
     }
@@ -79,12 +79,12 @@ class MarvelAPIManager: ObservableObject {
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
         print("searchComics: \(query)")
         var components = URLComponents(url: endpoint("/comics"), resolvingAgainstBaseURL: true)!
-        components.queryItems = [
+        components.queryItems = authQueryItems() + [
             URLQueryItem(name: "titleStartsWith", value: query),
             URLQueryItem(name: "orderBy", value: "title"),
             URLQueryItem(name: "limit", value: String(limit)),
             URLQueryItem(name: "offset", value: String(offset))
-        ] + authQueryItems()
+        ]
         print("components: \(components)")
         guard let url = components.url else { throw MarvelError.invalidURL }
         print("url: \(url)")
@@ -248,5 +248,22 @@ struct MarvelComicDetails {
             artists: artists.joined(separator: ", "),
             characters: characters.joined(separator: ", ")
         )
+    }
+}
+
+// MARK: - Utility Extensions (from MarvelApi.swift sample)
+
+private extension Date {
+    /// Returns the current time in milliseconds since 1970 (Unix epoch).
+    func currentTimeInMillis() -> Int64 {
+        Int64(timeIntervalSince1970 * 1000)
+    }
+}
+
+private extension String {
+    /// MD5 digest rendered as lowercase hexadecimal string.
+    var md5Value: String {
+        let digest = Insecure.MD5.hash(data: Data(utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 } 
