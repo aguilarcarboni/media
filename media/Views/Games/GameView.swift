@@ -10,7 +10,22 @@ import SwiftData
 
 struct GameView: View {
     @Bindable var game: Game
+    // Preview mode flag
+    var isPreview: Bool = false
+    // Environment
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    
+    // Toolbar State
+    @State private var showingDeleteAlert: Bool = false
+    @State private var tempRating: Double
+    
+    // Custom initializer
+    init(game: Game, isPreview: Bool = false) {
+        self._game = Bindable(wrappedValue: game)
+        self.isPreview = isPreview
+        _tempRating = State(initialValue: game.rating ?? game.igdbRating ?? 0.5)
+    }
     
     var body: some View {
         ScrollView {
@@ -111,29 +126,58 @@ struct GameView: View {
             .padding()
         }
         .toolbar {
-            ToolbarItem() {
-                Button {
-                    if game.played {
-                        game.markAsUnplayed()
-                    } else {
-                        game.markAsPlayed()
+            if isPreview {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        modelContext.insert(game)
+                        dismiss()
                     }
-                } label: {
-                    Image(systemName: game.played ? "checkmark.circle.fill" : "circle")
                 }
-            }
-            ToolbarItem() {
-                Menu {
-                    if game.igdbId != nil {
-                        Button("Refresh from IGDB") {
-                            refreshFromIGDB()
+            } else {
+                // Delete button
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(role: .destructive) { showingDeleteAlert = true } label: { Image(systemName: "trash") }
+                        .tint(.red)
+                }
+                // Played toggle
+                ToolbarItem() {
+                    Button {
+                        if game.played { game.markAsUnplayed() } else { game.markAsPlayed() }
+                    } label: { Image(systemName: game.played ? "checkmark.circle.fill" : "circle") }
+                }
+                // Rating menu (only when played)
+                if game.played {
+                    ToolbarItem {
+                        Menu {
+                            Stepper(value: $tempRating, in: 0...10, step: 0.1) {
+                                Text(String(format: "%.0f%%", tempRating * 10))
+                            }
+                            Button("Save") {
+                                game.rating = tempRating
+                                game.updated = Date()
+                            }
+                        } label: {
+                            Image(systemName: game.rating != nil ? "star.circle.fill" : "star.circle")
                         }
                     }
-                } label: {
-                    Image(systemName: "ellipsis")
+                }
+                // Overflow menu
+                ToolbarItem() {
+                    Menu {
+                        if game.igdbId != nil { Button("Refresh from IGDB") { refreshFromIGDB() } }
+                    } label: { Image(systemName: "ellipsis") }
                 }
             }
         }
+        // Delete alert
+        .alert("Delete Game?", isPresented: $showingDeleteAlert) {
+            Button("Delete", role: .destructive) {
+                modelContext.delete(game)
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text("This action cannot be undone.") }
     }
 
     private func refreshFromIGDB() {

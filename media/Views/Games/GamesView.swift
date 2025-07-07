@@ -11,9 +11,32 @@ import SwiftData
 struct GamesView: View {
     @Query private var games: [Game]
     @State private var selectedGame: Game?
-    @State private var showingCreateSheet = false
     @State private var searchQuery = ""
     
+    enum FilterOption: String, CaseIterable, Identifiable {
+        case all = "All"
+        case played = "Played"
+        case unplayed = "Unplayed"
+        var id: Self { self }
+    }
+
+    @State private var filterOption: FilterOption = .all
+
+    private var filteredGames: [Game] {
+        games
+            .filter { game in
+                switch filterOption {
+                case .all: return true
+                case .played: return game.played
+                case .unplayed: return !game.played
+                }
+            }
+            .filter { g in
+                searchQuery.isEmpty ||
+                g.name.localizedCaseInsensitiveContains(searchQuery)
+            }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if games.isEmpty {
@@ -28,16 +51,12 @@ struct GamesView: View {
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                     }
-                    Button(action: { showingCreateSheet = true }) {
-                        Label("Add Game", systemImage: "plus")
-                    }
-                    .buttonStyle(.borderedProminent)
                 }
                 .padding()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
-                    ForEach(games) { game in
+                    ForEach(filteredGames) { game in
                         GameRowView(game: game)
                             .contentShape(Rectangle())
                             .onTapGesture { selectedGame = game }
@@ -47,19 +66,20 @@ struct GamesView: View {
             }
         }
         .navigationTitle("Games")
-        .sheet(isPresented: $showingCreateSheet) {
-            CreateGameView()
-        }
         .sheet(item: $selectedGame) { game in
             NavigationStack { GameView(game: game).navigationTitle(game.name) }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button(action: { showingCreateSheet = true }) {
-                    Label("Add Item", systemImage: "plus")
+                Menu {
+                    Picker("Filter", selection: $filterOption) {
+                        ForEach(FilterOption.allCases) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
                 }
-                .help("Add new game")
-                .keyboardShortcut("n", modifiers: .command)
             }
         }
         .searchable(text: $searchQuery)

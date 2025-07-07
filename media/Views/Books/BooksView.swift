@@ -11,8 +11,32 @@ import SwiftData
 struct BooksView: View {
     @Query private var books: [Book]
     @State private var selectedBook: Book?
-    @State private var showingCreateSheet = false
     @State private var searchQuery = ""
+    
+    enum FilterOption: String, CaseIterable, Identifiable {
+        case all = "All"
+        case read = "Read"
+        case unread = "Unread"
+        var id: Self { self }
+    }
+    
+    @State private var filterOption: FilterOption = .all
+    
+    private var filteredBooks: [Book] {
+        books
+            .filter { book in
+                switch filterOption {
+                case .all: return true
+                case .read: return book.read
+                case .unread: return !book.read
+                }
+            }
+            .filter { bk in
+                searchQuery.isEmpty ||
+                bk.title.localizedCaseInsensitiveContains(searchQuery) ||
+                bk.author.localizedCaseInsensitiveContains(searchQuery)
+            }
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -28,16 +52,13 @@ struct BooksView: View {
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                     }
-                    Button(action: { showingCreateSheet = true }) {
-                        Label("Add Book", systemImage: "plus")
-                    }
                     .buttonStyle(.borderedProminent)
                 }
                 .padding()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
-                    ForEach(books) { book in
+                    ForEach(filteredBooks) { book in
                         BookRowView(book: book)
                             .contentShape(Rectangle())
                             .onTapGesture { selectedBook = book }
@@ -47,17 +68,20 @@ struct BooksView: View {
             }
         }
         .navigationTitle("Books")
-        .sheet(isPresented: $showingCreateSheet) { CreateBookView() }
         .sheet(item: $selectedBook) { book in
             NavigationStack { BookView(book: book).navigationTitle(book.title) }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button(action: { showingCreateSheet = true }) {
-                    Label("Add Item", systemImage: "plus")
+                Menu {
+                    Picker("Filter", selection: $filterOption) {
+                        ForEach(FilterOption.allCases) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
                 }
-                .help("Add new book")
-                .keyboardShortcut("n", modifiers: .command)
             }
         }
         .searchable(text: $searchQuery)
@@ -80,10 +104,7 @@ struct BookRowView: View {
                 Text(book.author)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                HStack {
-                    if let year = book.year { Text(String(year)).font(.caption).foregroundStyle(.secondary) }
-                    if let rating = book.displayRating { Text("⭐ \(rating, specifier: "%.1f")").font(.caption).foregroundStyle(.secondary) }
-                }
+                if let year = book.year { Text(String(year)).font(.caption).foregroundStyle(.secondary) }
             }
             Spacer()
             Button(action: {

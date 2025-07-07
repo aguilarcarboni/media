@@ -56,8 +56,6 @@ struct LibraryView: View {
                     MoviesView()
                 case .tvShows:
                     TVShowsView()
-                case .comics:
-                    ComicsView()
                 case .games:
                     GamesView()
                 case .books:
@@ -85,7 +83,6 @@ struct LibraryView: View {
 enum SidebarItem: String, CaseIterable, Identifiable {
     case movies = "Movies"
     case tvShows = "TV Shows"
-    case comics = "Comics"
     case games = "Games"
     case books = "Books"
     
@@ -97,8 +94,6 @@ enum SidebarItem: String, CaseIterable, Identifiable {
             return "film"
         case .tvShows:
             return "tv"
-        case .comics:
-            return "book"
         case .games:
             return "gamecontroller"
         case .books:

@@ -10,6 +10,22 @@ import SwiftData
 
 struct BookView: View {
     @Bindable var book: Book
+    // New property to indicate whether the view is shown as a preview before saving
+    var isPreview: Bool = false
+    // Environment
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    
+    // Toolbar state
+    @State private var showingDeleteAlert: Bool = false
+    @State private var tempRating: Double
+
+    // Custom initializer to support the `@Bindable` requirement
+    init(book: Book, isPreview: Bool = false) {
+        self._book = Bindable(wrappedValue: book)
+        self.isPreview = isPreview
+        _tempRating = State(initialValue: book.rating ?? book.appleRating ?? 0.5)
+    }
     
     var body: some View {
         ScrollView {
@@ -128,28 +144,75 @@ struct BookView: View {
             .padding()
         }
         .toolbar {
-            ToolbarItem() {
-                Button {
-                    if book.read {
-                        book.markAsUnread()
-                    } else {
-                        book.markAsRead()
-                    }
-                } label: {
-                    Image(systemName: book.read ? "checkmark.circle.fill" : "circle")
+            if isPreview {
+                // Preview mode: Cancel / Add buttons
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
                 }
-            }
-            ToolbarItem() {
-                Menu {
-                    if book.appleBookId != nil {
-                        Button("Refresh from Store") {
-                            refreshFromAppleBooks()
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        modelContext.insert(book)
+                        dismiss()
+                    }
+                }
+            } else {
+                // Existing toolbar when the book is already saved
+                // Delete button
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(role: .destructive) {
+                        showingDeleteAlert = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .tint(.red)
+                }
+                // Read toggle
+                ToolbarItem() {
+                    Button {
+                        if book.read {
+                            book.markAsUnread()
+                        } else {
+                            book.markAsRead()
+                        }
+                    } label: {
+                        Image(systemName: book.read ? "checkmark.circle.fill" : "circle")
+                    }
+                }
+                // Rating menu (only when read)
+                if book.read {
+                    ToolbarItem {
+                        Menu {
+                            Stepper(value: $tempRating, in: 0...10, step: 0.1) {
+                                Text(String(format: "%.0f%%", tempRating * 10))
+                            }
+                            Button("Save") {
+                                book.rating = tempRating
+                                book.updated = Date()
+                            }
+                        } label: {
+                            Image(systemName: book.rating != nil ? "star.circle.fill" : "star.circle")
                         }
                     }
-                } label: {
-                    Image(systemName: "ellipsis")
+                }
+                // Overflow menu
+                ToolbarItem() {
+                    Menu {
+                        if book.appleBookId != nil {
+                            Button("Refresh from Store") { refreshFromAppleBooks() }
+                        }
+                    } label: { Image(systemName: "ellipsis") }
                 }
             }
+        }
+        // Delete confirmation alert
+        .alert("Delete Book?", isPresented: $showingDeleteAlert) {
+            Button("Delete", role: .destructive) {
+                modelContext.delete(book)
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This action cannot be undone.")
         }
     }
     private func refreshFromAppleBooks() {

@@ -98,28 +98,16 @@ struct TVShowRowView: View {
                 Text(tvShow.name)
                     .font(.headline)
                 
-                HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let creators = tvShow.creators {
+                        Text(creators)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
                     if let year = tvShow.year {
                         Text(String(year))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    if let genres = tvShow.genres {
-                        Text("\(genres)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    if let rating = tvShow.displayRating {
-                        Text("\(rating, specifier: "%.1f")")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    if let numberOfSeasons = tvShow.numberOfSeasons {
-                        Text("\(numberOfSeasons) season\(numberOfSeasons == 1 ? "" : "s")")
-                            .font(.caption)
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                 }

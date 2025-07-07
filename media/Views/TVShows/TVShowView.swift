@@ -50,16 +50,6 @@ struct TVShowView: View {
                     
                     // TV Show details
                     VStack(alignment: .leading, spacing: 12) {
-                        // Watched status
-                        HStack {
-                            Image(systemName: tvShow.watched ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(tvShow.watched ? .green : .secondary)
-                                .font(.title2)
-                            
-                            Text(tvShow.watched ? "Watched" : "Not Watched")
-                                .font(.headline)
-                                .foregroundStyle(tvShow.watched ? .green : .secondary)
-                        }
                         
                         // Quick details
                         VStack(alignment: .leading, spacing: 6) {

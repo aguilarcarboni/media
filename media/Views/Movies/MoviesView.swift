@@ -122,26 +122,16 @@ struct MovieRowView: View {
                 Text(movie.title)
                     .font(.headline)
                 
-                HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let directors = movie.directors {
+                        Text(directors)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    
                     if let year = movie.year {
                         Text(String(year))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    if let genres = movie.genres {
-                        Text("\(genres)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    if let rating = movie.rating {
-                        Text("⭐ \(rating, specifier: "%.1f")")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("No rating")
-                            .font(.caption)
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                 }

@@ -34,16 +34,6 @@ struct MovieView: View {
                 HStack(alignment: .top, spacing: 16) {
                     // Movie details
                     VStack(alignment: .leading, spacing: 12) {
-                        // Watched status
-                        HStack {
-                            Image(systemName: movie.watched ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(movie.watched ? .green : .secondary)
-                                .font(.title2)
-                            
-                            Text(movie.watched ? "Watched" : "Not Watched")
-                                .font(.headline)
-                                .foregroundStyle(movie.watched ? .green : .secondary)
-                        }
                         
                         // Quick details
                         VStack(alignment: .leading, spacing: 6) {
@@ -71,7 +61,7 @@ struct MovieView: View {
 
                             if movie.rating != nil {
                                 Label {
-                                    Text("Personal ⭐️: \(movie.rating!, specifier: "%.1f")")
+                                    Text("Personal: \(movie.rating!, specifier: "%.1f")")
                                 } icon: {
                                     Image(systemName: "star.circle.fill")
                                 }
@@ -81,7 +71,7 @@ struct MovieView: View {
 
                             if movie.tmdbRating != nil {
                                 Label {
-                                    Text("TMDB ⭐️: \(movie.tmdbRating!, specifier: "%.1f")")
+                                    Text("TMDB: \(movie.tmdbRating!, specifier: "%.1f")")
                                 } icon: {
                                     Image(systemName: "star.circle.fill")
                                 }

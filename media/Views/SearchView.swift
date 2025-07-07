@@ -8,9 +8,16 @@ struct SearchView: View {
     @State private var movieResults: [TMDBMovieSearchResult] = []
     @State private var tvResults: [TMDBTVShowSearchResult] = []
     @State private var isSearching = false
-    // Category picker
-    private enum Category: String, CaseIterable, Identifiable { case top = "Top Results", movies = "Movies", tv = "TV Shows"; var id: Self { self } }
-    @State private var selectedCategory: Category = .top
+    // Category filters
+    private enum Category: String, CaseIterable, Identifiable {
+        case movies = "Movies"
+        case tv = "TV Shows"
+        case books = "Books"
+        case games = "Games"
+        var id: Self { self }
+    }
+    // Set of currently enabled categories (all enabled by default)
+    @State private var selectedCategories: Set<Category> = Set(Category.allCases)
     // Error handling
     @State private var showingError = false
     @State private var errorMessage = ""
@@ -31,14 +38,28 @@ struct SearchView: View {
     @State private var savedTVShowsByID: [String: TVShow] = [:]
     @State private var selectedTMDBTVShow: TMDBTVShowDetails?
     @State private var showingTVPreview = false
+    // Book search state
+    @State private var bookResults: [AppleBookSearchResult] = []
+    @State private var selectedAppleBook: AppleBookDetails?
+    @State private var showingBookPreview = false
+    // Saved books presentation & cache
+    @State private var presentingSavedBook: Book?
+    @State private var savedBookIDs: Set<String> = []
+    @State private var savedBooksByID: [String: Book] = [:]
+    // Game search state
+    @State private var gameResults: [IGDBGameSearchResult] = []
+    @State private var selectedIGDBGame: IGDBGameDetails?
+    @State private var showingGamePreview = false
+    @State private var presentingSavedGame: Game?
+    @State private var savedGameIDs: Set<String> = []
+    @State private var savedGamesByID: [String: Game] = [:]
 
     var body: some View {
         NavigationStack {
             Group {
-                let hasAnyResults = !movieResults.isEmpty || !tvResults.isEmpty
+                let hasAnyResults = !movieResults.isEmpty || !tvResults.isEmpty || !bookResults.isEmpty || !gameResults.isEmpty
                 if isSearching {
-                    ProgressView("Searching TMDB…")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    ProgressView("Searching databases...")
                 } else if hasSearched {
                     if !hasAnyResults {
                         VStack(spacing: 8) {
@@ -49,40 +70,50 @@ struct SearchView: View {
                                 .font(.headline)
                                 .foregroundStyle(.secondary)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         ScrollView {
-                            Picker("Category", selection: $selectedCategory) {
-                                ForEach(Category.allCases) { cat in Text(cat.rawValue).tag(cat) }
-                            }
-                            .pickerStyle(.segmented)
-                            .padding([.horizontal, .top])
-
                             LazyVStack(spacing: 12) {
-                                switch selectedCategory {
-                                case .movies:
+                                if selectedCategories.contains(.movies) {
                                     ForEach(movieResults) { movieSearchResultRow($0, isSaved: savedMovieIDs.contains(String($0.id))) }
-                                case .tv:
+                                }
+                                if selectedCategories.contains(.tv) {
                                     ForEach(tvResults) { tvShowSearchResultRow($0, isSaved: savedTVIDs.contains(String($0.id))) }
-                                case .top:
-                                    ForEach(movieResults.prefix(5)) { movieSearchResultRow($0, isSaved: savedMovieIDs.contains(String($0.id))) }
-                                    ForEach(tvResults.prefix(5)) { tvShowSearchResultRow($0, isSaved: savedTVIDs.contains(String($0.id))) }
+                                }
+                                if selectedCategories.contains(.books) {
+                                    ForEach(bookResults) { bookSearchResultRow($0, isSaved: savedBookIDs.contains(String($0.trackId))) }
+                                }
+                                if selectedCategories.contains(.games) {
+                                    ForEach(gameResults) { gameSearchResultRow($0, isSaved: savedGameIDs.contains(String($0.id))) }
                                 }
                             }
                             .padding(.horizontal)
                         }
                     }
                 } else {
-                    VStack {
-                        Spacer()
-                        ContentUnavailableView("Search", systemImage: "magnifyingglass", description: Text(searchQuery.isEmpty ? "Start typing to search your media library…" : "Press enter to search…"))
-                        Spacer()
+                    ContentUnavailableView("Search", systemImage: "magnifyingglass", description: Text(searchQuery.isEmpty ? "Start typing to search your media library…" : "Press enter to search…"))
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        ForEach(Category.allCases) { cat in
+                            Button(action: {
+                                if selectedCategories.contains(cat) {
+                                    selectedCategories.remove(cat)
+                                } else {
+                                    selectedCategories.insert(cat)
+                                }
+                            }) {
+                                Label(cat.rawValue, systemImage: selectedCategories.contains(cat) ? "checkmark" : "")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .navigationTitle("Search")
-            .searchable(text: $searchQuery, prompt: "Search Movies & TV Shows")
+            .searchable(text: $searchQuery, prompt: "Search Media")
             .onSubmit(of: .search) {
                 Task { await performSearch() }
             }
@@ -90,6 +121,8 @@ struct SearchView: View {
                 hasSearched = false
                 movieResults = []
                 tvResults = []
+                bookResults = []
+                gameResults = []
             }
             // Preview sheet
             .sheet(isPresented: $showingPreview, onDismiss: refreshSavedCache) {
@@ -103,6 +136,18 @@ struct SearchView: View {
                     NavigationStack { TVShowView(tvShow: details.toTVShow(), isPreview: true) }
                 }
             }
+            // Book Preview
+            .sheet(isPresented: $showingBookPreview, onDismiss: refreshSavedCache) {
+                if let details = selectedAppleBook {
+                    NavigationStack { BookView(book: details.toBook(), isPreview: true) }
+                }
+            }
+            // Game Preview
+            .sheet(isPresented: $showingGamePreview, onDismiss: refreshSavedCache) {
+                if let details = selectedIGDBGame {
+                    NavigationStack { GameView(game: details.toGame(), isPreview: true) }
+                }
+            }
             // Saved movie sheet
             .sheet(item: $presentingSavedMovie, onDismiss: refreshSavedCache) { movie in
                 NavigationStack { MovieView(movie: movie) }
@@ -110,6 +155,14 @@ struct SearchView: View {
             // Saved TV show sheet
             .sheet(item: $presentingSavedTVShow, onDismiss: refreshSavedCache) { show in
                 NavigationStack { TVShowView(tvShow: show) }
+            }
+            // Saved Book sheet
+            .sheet(item: $presentingSavedBook, onDismiss: refreshSavedCache) { bk in
+                NavigationStack { BookView(book: bk) }
+            }
+            // Saved Game sheet
+            .sheet(item: $presentingSavedGame, onDismiss: refreshSavedCache) { gm in
+                NavigationStack { GameView(game: gm) }
             }
         }
     }
@@ -125,6 +178,20 @@ struct SearchView: View {
     private func tvShowSearchResultRow(_ result: TMDBTVShowSearchResult, isSaved: Bool) -> some View {
         Button(action: { selectTVShow(result, isSaved: isSaved) }) {
             searchRowThumbnail(url: TMDBAPIManager.shared.thumbnailURL(path: result.posterPath), title: result.name, subtitle: subtitleTV(result), trailingIcon: isSaved ? "checkmark.circle.fill" : "chevron.right", iconColor: isSaved ? .green : .secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func bookSearchResultRow(_ result: AppleBookSearchResult, isSaved: Bool) -> some View {
+        Button(action: { selectBook(result, isSaved: isSaved) }) {
+            searchRowThumbnail(url: result.coverURL, title: result.trackName ?? "Unknown Title", subtitle: subtitleBook(result), trailingIcon: isSaved ? "checkmark.circle.fill" : "chevron.right", iconColor: isSaved ? .green : .secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func gameSearchResultRow(_ result: IGDBGameSearchResult, isSaved: Bool) -> some View {
+        Button(action: { selectGame(result, isSaved: isSaved) }) {
+            searchRowThumbnail(url: result.thumbnailURL, title: result.name ?? "Unknown Title", subtitle: subtitleGame(result), trailingIcon: isSaved ? "checkmark.circle.fill" : "chevron.right", iconColor: isSaved ? .green : .secondary)
         }
         .buttonStyle(.plain)
     }
@@ -161,6 +228,20 @@ struct SearchView: View {
         return parts.joined(separator: " • ")
     }
 
+    private func subtitleBook(_ result: AppleBookSearchResult) -> String {
+        var parts: [String] = ["Book"]
+        if let year = result.year { parts.append(String(year)) }
+        return parts.joined(separator: " • ")
+    }
+
+    private func subtitleGame(_ result: IGDBGameSearchResult) -> String {
+        var parts: [String] = ["Game"]
+        if let date = result.releaseDate {
+            parts.append(String(Calendar.current.component(.year, from: date)))
+        }
+        return parts.joined(separator: " • ")
+    }
+
     // MARK: – Actions
     @MainActor private func performSearch() async {
         guard !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -168,8 +249,12 @@ struct SearchView: View {
         do {
             async let movies = TMDBAPIManager.shared.searchMovieResults(query: searchQuery)
             async let tvs = TMDBAPIManager.shared.searchTVShowResults(query: searchQuery)
+            async let books = AppleBooksAPIManager.shared.searchBooks(term: searchQuery)
+            async let games = IGDBAPIManager.shared.searchGameResults(query: searchQuery)
             self.movieResults = try await movies
             self.tvResults = try await tvs
+            self.bookResults = try await books
+            self.gameResults = try await games
 
             // Update saved cache sets
             let existingMovies = (try? modelContext.fetch(FetchDescriptor<Movie>())) ?? []
@@ -191,6 +276,19 @@ struct SearchView: View {
                 }
             }
             savedTVShowsByID = tvDict
+
+            let existingBooks = (try? modelContext.fetch(FetchDescriptor<Book>())) ?? []
+            savedBookIDs = Set(existingBooks.compactMap { $0.appleBookId })
+            var bookDict: [String: Book] = [:]
+            for book in existingBooks { if let id = book.appleBookId { bookDict[id] = book } }
+            savedBooksByID = bookDict
+
+            let existingGames = (try? modelContext.fetch(FetchDescriptor<Game>())) ?? []
+            savedGameIDs = Set(existingGames.compactMap { $0.igdbId })
+            var gameDict: [String: Game] = [:]
+            for gm in existingGames { if let id = gm.igdbId { gameDict[id] = gm } }
+            savedGamesByID = gameDict
+
             self.isSearching = false
             self.hasSearched = true
         } catch {
@@ -253,6 +351,58 @@ struct SearchView: View {
         }
     }
 
+    private func selectBook(_ result: AppleBookSearchResult, isSaved: Bool) {
+        let idStr = String(result.trackId)
+        if let existing = savedBooksByID[idStr] {
+            presentingSavedBook = existing
+        } else {
+            isLoadingMovieDetails = true // reuse loading indicator
+            Task {
+                do {
+                    let details = try await AppleBooksAPIManager.shared.getBook(id: result.trackId)
+                    await MainActor.run {
+                        self.selectedAppleBook = details
+                        self.isLoadingMovieDetails = false
+                        self.showingBookPreview = true
+                    }
+                } catch {
+                    if error is CancellationError { return }
+                    await MainActor.run {
+                        self.errorMessage = error.localizedDescription
+                        self.showingError = true
+                        self.isLoadingMovieDetails = false
+                    }
+                }
+            }
+        }
+    }
+
+    private func selectGame(_ result: IGDBGameSearchResult, isSaved: Bool) {
+        let idStr = String(result.id)
+        if let existing = savedGamesByID[idStr] {
+            presentingSavedGame = existing
+        } else {
+            isLoadingMovieDetails = true
+            Task {
+                do {
+                    let details = try await IGDBAPIManager.shared.getGame(id: result.id)
+                    await MainActor.run {
+                        self.selectedIGDBGame = details
+                        self.isLoadingMovieDetails = false
+                        self.showingGamePreview = true
+                    }
+                } catch {
+                    if error is CancellationError { return }
+                    await MainActor.run {
+                        self.errorMessage = error.localizedDescription
+                        self.showingError = true
+                        self.isLoadingMovieDetails = false
+                    }
+                }
+            }
+        }
+    }
+
     private func refreshSavedCache() {
         let existingMovies = (try? modelContext.fetch(FetchDescriptor<Movie>())) ?? []
         savedMovieIDs = Set(existingMovies.compactMap { $0.tmdbId })
@@ -265,6 +415,18 @@ struct SearchView: View {
         var tDict: [String: TVShow] = [:]
         for s in existingShows { if let id = s.tmdbId { tDict[id] = s } }
         savedTVShowsByID = tDict
+
+        let existingBooks = (try? modelContext.fetch(FetchDescriptor<Book>())) ?? []
+        savedBookIDs = Set(existingBooks.compactMap { $0.appleBookId })
+        var bDict: [String: Book] = [:]
+        for b in existingBooks { if let id = b.appleBookId { bDict[id] = b } }
+        savedBooksByID = bDict
+
+        let existingGames = (try? modelContext.fetch(FetchDescriptor<Game>())) ?? []
+        savedGameIDs = Set(existingGames.compactMap { $0.igdbId })
+        var gDict: [String: Game] = [:]
+        for g in existingGames { if let id = g.igdbId { gDict[id] = g } }
+        savedGamesByID = gDict
     }
 }
 
