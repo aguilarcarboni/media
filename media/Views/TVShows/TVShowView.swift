@@ -18,6 +18,12 @@ struct TVShowView: View {
     @State private var showingDeleteAlert: Bool = false
     @State private var tempRating: Double
     
+    // Episode list state
+    @State private var episodeResults: [TMDBEpisode] = []
+    @State private var isLoadingEpisodes: Bool = false
+    @State private var episodeErrorMessage: String = ""
+    @State private var showEpisodeError: Bool = false
+    
     // Custom initializer to configure state values
     init(tvShow: TVShow, isPreview: Bool = false) {
         self._tvShow = Bindable(wrappedValue: tvShow)
@@ -150,6 +156,36 @@ struct TVShowView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 
+                // Episodes list
+                if isLoadingEpisodes {
+                    ProgressView("Loading episodes…")
+                        .frame(maxWidth: .infinity)
+                } else if !episodeResults.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Episodes (") + Text(String(episodeResults.count)) + Text(")").font(.headline)
+                        ForEach(episodeResults.prefix(20), id: \.id) { ep in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("S\(ep.seasonNumber)E\(ep.episodeNumber) • \(ep.name)")
+                                    .font(.subheadline)
+                                if let air = ep.airDate {
+                                    Text(air)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        if episodeResults.count > 20 {
+                            Text("Showing first 20 episodes")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding()
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                
                 // Cast and Crew
                 if !tvShow.castList.isEmpty || !tvShow.creatorList.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
@@ -208,7 +244,9 @@ struct TVShowView: View {
             if isPreview {
                 ToolbarItem(placement: .cancellationAction) { Button(action: { dismiss() }) { Image(systemName: "xmark") } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(action: { modelContext.insert(tvShow); dismiss() }) { Image(systemName: "plus") }
+                    Button(action: {
+                        Task { await addTVShowAndEpisodes(); dismiss() }
+                    }) { Image(systemName: "plus") }
                 }
             } else {
                 // Delete TV show toolbar button
@@ -267,6 +305,10 @@ struct TVShowView: View {
         } message: {
             Text("This action cannot be undone.")
         }
+        .alert("Error", isPresented: $showEpisodeError) { Button("OK") {} } message: { Text(episodeErrorMessage) }
+        .task(id: tvShow.tmdbId) {
+            await loadEpisodes()
+        }
     }
     
     private func refreshFromTMDB() {
@@ -282,6 +324,58 @@ struct TVShowView: View {
             } catch {
                 print("Failed to refresh from TMDB: \(error)")
             }
+        }
+    }
+
+    // MARK: – Episode loading
+    private func loadEpisodes() async {
+        guard episodeResults.isEmpty, let idString = tvShow.tmdbId, let id = Int(idString), let seasons = tvShow.numberOfSeasons, seasons > 0 else { return }
+        isLoadingEpisodes = true
+        do {
+            let eps = try await TMDBAPIManager.shared.getAllEpisodes(tvId: id, numberOfSeasons: seasons)
+            await MainActor.run {
+                self.episodeResults = eps
+                self.isLoadingEpisodes = false
+            }
+        } catch {
+            if error is CancellationError { return }
+            await MainActor.run {
+                self.episodeErrorMessage = error.localizedDescription
+                self.showEpisodeError = true
+                self.isLoadingEpisodes = false
+            }
+        }
+    }
+
+    // MARK: – Add TV Show & Episodes
+    @MainActor
+    private func addTVShowAndEpisodes() async {
+        modelContext.insert(tvShow)
+        do { try modelContext.save() } catch { return }
+        guard let idStr = tvShow.tmdbId, let id = Int(idStr), let seasons = tvShow.numberOfSeasons else { return }
+        do {
+            let eps = try await TMDBAPIManager.shared.getAllEpisodes(tvId: id, numberOfSeasons: seasons)
+            let existing: [Episode] = (try? modelContext.fetch(FetchDescriptor<Episode>())) ?? []
+            let existingIds = Set(existing.compactMap { $0.tmdbId })
+            for ep in eps {
+                if existingIds.contains(ep.id) { continue }
+                let episodeEntity = Episode(
+                    tmdbId: ep.id,
+                    name: ep.name,
+                    overview: ep.overview,
+                    seasonNumber: ep.seasonNumber,
+                    episodeNumber: ep.episodeNumber,
+                    airDate: ep.airDate,
+                    runtime: ep.runtime,
+                    rating: ep.voteAverage,
+                    stillPath: ep.stillPath,
+                    tvShow: tvShow
+                )
+                modelContext.insert(episodeEntity)
+            }
+            try? modelContext.save()
+        } catch {
+            // ignore episode save errors
         }
     }
 } 

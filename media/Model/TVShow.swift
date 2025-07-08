@@ -31,6 +31,8 @@ final class TVShow: Identifiable {
     var numberOfEpisodes: Int?
     var created: Date = Date()
     var updated: Date = Date()
+
+    @Relationship(deleteRule: .cascade) var episodes: [Episode]? = nil
     
     init(
         name: String = "",

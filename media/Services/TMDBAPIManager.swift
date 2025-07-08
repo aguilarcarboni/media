@@ -283,6 +283,83 @@ class TMDBAPIManager: ObservableObject {
     }
 }
 
+// MARK: - Season & Episode Models
+struct TMDBSeasonDetails: Codable {
+    let id: Int
+    let name: String
+    let overview: String?
+    let seasonNumber: Int
+    let airDate: String?
+    let posterPath: String?
+    let episodes: [TMDBEpisode]
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, overview, episodes
+        case seasonNumber = "season_number"
+        case airDate = "air_date"
+        case posterPath = "poster_path"
+    }
+}
+
+struct TMDBEpisode: Codable {
+    let id: Int
+    let name: String
+    let overview: String?
+    let seasonNumber: Int
+    let episodeNumber: Int
+    let airDate: String?
+    let runtime: Int?
+    let stillPath: String?
+    let voteAverage: Double
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, overview, runtime
+        case seasonNumber = "season_number"
+        case episodeNumber = "episode_number"
+        case airDate = "air_date"
+        case stillPath = "still_path"
+        case voteAverage = "vote_average"
+    }
+}
+
+// MARK: - Season / Episode Fetching
+extension TMDBAPIManager {
+    /// Fetch details for a single season of a TV show (including episode list)
+    func getSeason(tvId: Int, seasonNumber: Int) async throws -> TMDBSeasonDetails {
+        guard hasBearerToken else { throw TMDBError.missingBearerToken }
+
+        let url = URL(string: getEndpoint("/tv/\(tvId)/season/\(seasonNumber)"))!
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: true)!
+        components.queryItems = [URLQueryItem(name: "language", value: language)]
+        guard let finalURL = components.url else { throw TMDBError.invalidURL }
+        let request = createAuthenticatedRequest(for: finalURL)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else { throw TMDBError.networkError }
+        let seasonDetails = try JSONDecoder().decode(TMDBSeasonDetails.self, from: data)
+        return seasonDetails
+    }
+
+    /// Fetch all episodes for a TV show by iterating through its seasons.
+    func getAllEpisodes(tvId: Int, numberOfSeasons: Int) async throws -> [TMDBEpisode] {
+        var allEpisodes: [TMDBEpisode] = []
+        for season in 1...numberOfSeasons {
+            do {
+                let seasonDetails = try await getSeason(tvId: tvId, seasonNumber: season)
+                allEpisodes.append(contentsOf: seasonDetails.episodes)
+            } catch {
+                // Skip failed season, continue others
+                continue
+            }
+        }
+        return allEpisodes.sorted(by: { lhs, rhs in
+            if lhs.seasonNumber == rhs.seasonNumber {
+                return lhs.episodeNumber < rhs.episodeNumber
+            }
+            return lhs.seasonNumber < rhs.seasonNumber
+        })
+    }
+}
+
 // MARK: - Data Models
 
 // MARK: - Movie Models
