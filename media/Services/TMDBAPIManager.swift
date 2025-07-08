@@ -34,21 +34,15 @@ class TMDBAPIManager: ObservableObject {
     
     // MARK: - Movie Search
     func searchMovies(query: String, page: Int = 1) async throws -> TMDBSearchResponse {
-        print("🎬 TMDBAPIManager: Starting movie search for query: '\(query)', page: \(page)")
-        
         guard hasBearerToken else {
-            print("❌ TMDBAPIManager: Missing bearer token")
             throw TMDBError.missingBearerToken
         }
-        print("✅ TMDBAPIManager: Bearer token is available")
         
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            print("⚠️ TMDBAPIManager: Empty query, returning empty results")
             return TMDBSearchResponse(page: 1, results: [], totalPages: 0, totalResults: 0)
         }
         
         let url = URL(string: getEndpoint("/search/movie"))!
-        print("🌐 TMDBAPIManager: Base URL: \(url)")
         
         var components = URLComponents(url: url, resolvingAgainstBaseURL: true)!
         let queryItems: [URLQueryItem] = [
@@ -60,53 +54,26 @@ class TMDBAPIManager: ObservableObject {
         components.queryItems = queryItems
         
         guard let finalURL = components.url else {
-            print("❌ TMDBAPIManager: Failed to create final URL")
             throw TMDBError.invalidURL
         }
         
-        print("🔗 TMDBAPIManager: Final URL: \(finalURL)")
-        
         let request = createAuthenticatedRequest(for: finalURL)
-        print("📝 TMDBAPIManager: Request headers: \(request.allHTTPHeaderFields ?? [:])")
-        print("🔧 TMDBAPIManager: Request method: \(request.httpMethod ?? "nil")")
-        print("⏱️ TMDBAPIManager: Request timeout: \(request.timeoutInterval)")
-        
-        print("🚀 TMDBAPIManager: Starting network request...")
         
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            print("📡 TMDBAPIManager: Network request completed")
-            print("📊 TMDBAPIManager: Response data size: \(data.count) bytes")
             
             if let httpResponse = response as? HTTPURLResponse {
-                print("📈 TMDBAPIManager: HTTP Status Code: \(httpResponse.statusCode)")
-                print("📋 TMDBAPIManager: Response headers: \(httpResponse.allHeaderFields)")
-                
                 guard httpResponse.statusCode == 200 else {
-                    print("❌ TMDBAPIManager: HTTP error - status code: \(httpResponse.statusCode)")
-                    if data.count > 0 {
-                        print("📄 TMDBAPIManager: Error response body: \(String(data: data, encoding: .utf8) ?? "Unable to decode")")
-                    }
                     throw TMDBError.networkError
                 }
-            } else {
-                print("⚠️ TMDBAPIManager: Response is not HTTPURLResponse")
+            } else {    
                 throw TMDBError.networkError
             }
             
-            print("🔍 TMDBAPIManager: Attempting to decode JSON response...")
             let searchResponse = try JSONDecoder().decode(TMDBSearchResponse.self, from: data)
-            print("✅ TMDBAPIManager: Successfully decoded response with \(searchResponse.results.count) results")
-            print("📄 TMDBAPIManager: Total results: \(searchResponse.totalResults), Total pages: \(searchResponse.totalPages)")
             
             return searchResponse
         } catch {
-            print("💥 TMDBAPIManager: Network request failed with error: \(error)")
-            print("🔍 TMDBAPIManager: Error details: \(error.localizedDescription)")
-            if let urlError = error as? URLError {
-                print("🌐 TMDBAPIManager: URLError code: \(urlError.code.rawValue)")
-                print("🌐 TMDBAPIManager: URLError domain: \(urlError.errorCode)")
-            }
             throw error
         }
     }
@@ -119,15 +86,11 @@ class TMDBAPIManager: ObservableObject {
     
     // MARK: - TV Show Search
     func searchTVShows(query: String, page: Int = 1) async throws -> TMDBTVSearchResponse {
-        print("📺 TMDBAPIManager: Starting TV show search for query: '\(query)', page: \(page)")
-        
         guard hasBearerToken else {
-            print("❌ TMDBAPIManager: Missing bearer token")
             throw TMDBError.missingBearerToken
         }
         
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            print("⚠️ TMDBAPIManager: Empty query, returning empty results")
             return TMDBTVSearchResponse(page: 1, results: [], totalPages: 0, totalResults: 0)
         }
         
@@ -157,11 +120,9 @@ class TMDBAPIManager: ObservableObject {
             }
             
             let searchResponse = try JSONDecoder().decode(TMDBTVSearchResponse.self, from: data)
-            print("✅ TMDBAPIManager: Successfully decoded TV show response with \(searchResponse.results.count) results")
             
             return searchResponse
         } catch {
-            print("💥 TMDBAPIManager: TV show search failed with error: \(error)")
             throw error
         }
     }

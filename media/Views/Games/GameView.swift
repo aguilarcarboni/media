@@ -50,15 +50,6 @@ struct GameView: View {
 
                     // Game details
                     VStack(alignment: .leading, spacing: 12) {
-                        // Played status
-                        HStack {
-                            Image(systemName: game.played ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(game.played ? .green : .secondary)
-                                .font(.title2)
-                            Text(game.played ? "Played" : "Not Played")
-                                .font(.headline)
-                                .foregroundStyle(game.played ? .green : .secondary)
-                        }
 
                         // Quick details
                         VStack(alignment: .leading, spacing: 6) {
@@ -83,6 +74,26 @@ struct GameView: View {
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                             }
+
+                            if let igdbRating = game.igdbRating {
+                                Label {
+                                    Text("IGDB: \(igdbRating * 10, specifier: "%.0f%%")")
+                                } icon: {
+                                    Image(systemName: "star.circle.fill")
+                                }
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            }
+
+                            if let rating = game.rating {
+                                Label {
+                                    Text("Personal: \(rating * 10, specifier: "%.0f%%")")
+                                } icon: {
+                                    Image(systemName: "star.circle.fill")
+                                }
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            }
                         }
 
                         Spacer()
@@ -90,9 +101,7 @@ struct GameView: View {
 
                     Spacer()
                 }
-                .padding()
-                .background(.regularMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                // Header now matches design of MovieView/TVShowView without card background
                 
                 // Summary
                 if let summary = game.summary, !summary.isEmpty {
@@ -100,39 +109,41 @@ struct GameView: View {
                         Text("Summary").font(.headline)
                         Text(summary).font(.body)
                     }
-                    .padding().background(.regularMaterial).cornerRadius(8)
+                    .padding()
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-                
-                // Additional details
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Details").font(.headline)
-                    VStack(spacing: 8) {
-                        HStack { Text("Added:"); Spacer(); Text(game.created, format: .dateTime.day().month().year()) }
-                        if game.updated != game.created {
-                            HStack { Text("Updated:"); Spacer(); Text(game.updated, format: .dateTime.day().month().year()) }
-                        }
-                        if let igdbId = game.igdbId {
-                            HStack { Text("IGDB ID:"); Spacer(); Text(igdbId).foregroundStyle(.secondary) }
-                        }
-                        if game.rating != nil && game.igdbRating != nil {
-                            HStack { Text("Your Rating:"); Spacer(); Text("⭐ \(game.rating!, specifier: "%.1f")") }
-                            HStack { Text("IGDB Rating:"); Spacer(); Text("⭐ \(game.igdbRating!, specifier: "%.1f")") }
-                        }
+
+                // Backdrop / Cover image (matches MovieView/TVShowView layout)
+                ZStack(alignment: .bottomLeading) {
+                    AsyncImage(url: game.coverURL) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(.secondary.opacity(0.3))
+                            .overlay {
+                                Image(systemName: "photo")
+                                    .font(.system(size: 48))
+                                    .foregroundStyle(.secondary)
+                            }
                     }
+                    .frame(height: 200)
+                    .clipped()
                 }
-                .padding().background(.regularMaterial).cornerRadius(8)
-                Spacer()
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             .padding()
         }
         .toolbar {
             if isPreview {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(action: { dismiss() }) { Image(systemName: "xmark") } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
+                    Button(action: {
                         modelContext.insert(game)
                         dismiss()
-                    }
+                    }) { Image(systemName: "plus") }
                 }
             } else {
                 // Delete button

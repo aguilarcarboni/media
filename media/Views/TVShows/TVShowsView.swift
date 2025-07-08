@@ -18,6 +18,8 @@ struct TVShowsView: View {
         case all = "All"
         case watched = "Watched"
         case unwatched = "Unwatched"
+        case rated = "Rated"
+        case unrated = "Unrated"
 
         var id: Self { self }
     }
@@ -30,6 +32,8 @@ struct TVShowsView: View {
         case nameZA = "Name Z-A"
         case yearNewest = "Year Newest"
         case yearOldest = "Year Oldest"
+        case ratingHighLow = "Rating High-Low"
+        case ratingLowHigh = "Rating Low-High"
 
         var id: Self { self }
     }
@@ -46,6 +50,10 @@ struct TVShowsView: View {
                     return tvShow.watched
                 case .unwatched:
                     return !tvShow.watched
+                case .rated:
+                    return tvShow.rating != nil
+                case .unrated:
+                    return tvShow.rating == nil
                 }
             }
             .filter { tvShow in
@@ -61,6 +69,14 @@ struct TVShowsView: View {
                     return (lhs.year ?? 0) > (rhs.year ?? 0)
                 case .yearOldest:
                     return (lhs.year ?? 0) < (rhs.year ?? 0)
+                case .ratingHighLow:
+                    let lhsRating = lhs.rating ?? -1
+                    let rhsRating = rhs.rating ?? -1
+                    return lhsRating > rhsRating
+                case .ratingLowHigh:
+                    let lhsRating = lhs.rating ?? Double.greatestFiniteMagnitude
+                    let rhsRating = rhs.rating ?? Double.greatestFiniteMagnitude
+                    return lhsRating < rhsRating
                 }
             }
     }
@@ -142,6 +158,11 @@ struct TVShowRowView: View {
 
                     if let year = tvShow.year {
                         Text(String(year))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let rating = tvShow.rating {
+                        Text(String(format: "%.1f", rating))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }

@@ -60,6 +60,8 @@ struct LibraryView: View {
                     GamesView()
                 case .books:
                     BooksView()
+                case .comics:
+                    ComicsView()
                 case .none:
                     VStack(spacing: 16) {
                         Image(systemName: "sidebar.left")
@@ -85,6 +87,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case tvShows = "TV Shows"
     case games = "Games"
     case books = "Books"
+    case comics = "Comics"
     
     var id: String { self.rawValue }
     
@@ -98,6 +101,8 @@ enum SidebarItem: String, CaseIterable, Identifiable {
             return "gamecontroller"
         case .books:
             return "book.closed"
+        case .comics:
+            return "book"
         }
     }
 }

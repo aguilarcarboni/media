@@ -2,86 +2,51 @@
 //  ComicsView.swift
 //  media
 //
-//  Created by Andrés on 6/7/2025.
+//  Created by AI on 07/07/2025.
+//
+//  Top-level view for Comics library showing Volumes or Issues list.
 //
 
 import SwiftUI
-import SwiftData
 
 struct ComicsView: View {
-    @Query private var comics: [Comic]
-    @State private var selectedComic: Comic?
-    @State private var showingCreateSheet = false
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            if comics.isEmpty {
-                VStack(spacing: 16) {
-                    Image(systemName: "book").font(.system(size: 48)).foregroundStyle(.secondary)
-                    VStack(spacing: 8) {
-                        Text("No Comics Yet").font(.title2).bold()
-                        Text("Add your first comic to get started").font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    }
-                    Button(action: { showingCreateSheet = true }) { Label("Add Comic", systemImage: "plus") }
-                        .buttonStyle(.borderedProminent)
-                }
-                .padding().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List {
-                    ForEach(comics) { comic in
-                        Button(action: { selectedComic = comic }) {
-                            ComicRowView(comic: comic)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .listStyle(.plain)
+    // Sections pushable via NavigationStack
+    enum Section: Hashable {
+        case volumes
+        case issues
+
+        var title: String {
+            switch self {
+            case .volumes: "Volumes"
+            case .issues: "Issues"
             }
         }
-        .navigationTitle("Comics")
-        .sheet(isPresented: $showingCreateSheet) { CreateComicView() }
-        .sheet(item: $selectedComic) { comic in
-            NavigationStack { ComicView(comic: comic) }
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button(action: { showingCreateSheet = true }) {
-                    Label("Add Comic", systemImage: "plus")
-                }.help("Add new comic").keyboardShortcut("n", modifiers: .command)
+        var systemImage: String {
+            switch self {
+            case .volumes: "books.vertical"
+            case .issues: "book"
             }
         }
     }
-}
 
-struct ComicRowView: View {
-    let comic: Comic
+    @State private var path = NavigationPath()
+
     var body: some View {
-        HStack {
-            AsyncImage(url: comic.thumbnailURL) { img in
-                img.resizable().aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Rectangle().fill(.secondary.opacity(0.2)).overlay { Image(systemName: "photo") }
-            }
-            .frame(width: 40, height: 60)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(comic.title).font(.headline).strikethrough(comic.read)
-                HStack {
-                    if let issue = comic.issueNumber {
-                        Text("#\(issue)").font(.caption).foregroundStyle(.secondary)
-                    }
-                    if let series = comic.seriesName {
-                        Text("• \(series)").font(.caption).foregroundStyle(.secondary)
-                    }
-                    if let rating = comic.rating {
-                        Text("• ⭐ \(rating, specifier: "%.1f")").font(.caption).foregroundStyle(.secondary)
-                    }
+        NavigationStack(path: $path) {
+            List {
+                NavigationLink(value: Section.volumes) {
+                    Label(Section.volumes.title, systemImage: Section.volumes.systemImage)
+                }
+                NavigationLink(value: Section.issues) {
+                    Label(Section.issues.title, systemImage: Section.issues.systemImage)
                 }
             }
-            Spacer()
-            if comic.read {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            .navigationTitle("Comics")
+            .navigationDestination(for: Section.self) { section in
+                switch section {
+                case .volumes: VolumesView()
+                case .issues: IssuesView()
+                }
             }
         }
     }

@@ -14,6 +14,7 @@ struct SearchView: View {
         case tv = "TV Shows"
         case books = "Books"
         case games = "Games"
+        case comics = "Comic Volumes"
         var id: Self { self }
     }
     // Set of currently enabled categories (all enabled by default)
@@ -46,6 +47,14 @@ struct SearchView: View {
     @State private var presentingSavedBook: Book?
     @State private var savedBookIDs: Set<String> = []
     @State private var savedBooksByID: [String: Book] = [:]
+    // Comic (Volume) search state
+    @State private var volumeResults: [ComicVineVolumeSearchResult] = []
+    @State private var selectedVolumeDetails: ComicVineVolumeDetails?
+    @State private var showingVolumePreview = false
+    @State private var presentingSavedVolume: Volume?
+    @State private var savedVolumeIDs: Set<String> = []
+    @State private var savedVolumesByID: [String: Volume] = [:]
+
     // Game search state
     @State private var gameResults: [IGDBGameSearchResult] = []
     @State private var selectedIGDBGame: IGDBGameDetails?
@@ -53,6 +62,88 @@ struct SearchView: View {
     @State private var presentingSavedGame: Game?
     @State private var savedGameIDs: Set<String> = []
     @State private var savedGamesByID: [String: Game] = [:]
+    // Owned volumes results for library search
+    @State private var ownedVolumeResults: [Volume] = []
+
+    // MARK: – Unified result wrappers
+    private enum MediaItem: Identifiable {
+        case movie(TMDBMovieSearchResult)
+        case tv(TMDBTVShowSearchResult)
+        case book(AppleBookSearchResult)
+        case game(IGDBGameSearchResult)
+        case volume(ComicVineVolumeSearchResult)
+
+        var id: String {
+            switch self {
+            case .movie(let m): return "movie_\(m.id)"
+            case .tv(let s): return "tv_\(s.id)"
+            case .book(let b): return "book_\(b.trackId)"
+            case .game(let g): return "game_\(g.id)"
+            case .volume(let v): return "volume_\(v.id)"
+            }
+        }
+
+        var titleForScoring: String {
+            switch self {
+            case .movie(let m): return m.title
+            case .tv(let s): return s.name
+            case .book(let b): return b.trackName ?? ""
+            case .game(let g): return g.name ?? ""
+            case .volume(let v): return v.title
+            }
+        }
+    }
+
+    private enum LibraryItem: Identifiable {
+        case movie(Movie)
+        case tv(TVShow)
+        case book(Book)
+        case game(Game)
+        case volume(Volume)
+
+        var id: String {
+            switch self {
+            case .movie(let m): return "movie_\(m.id.uuidString)"
+            case .tv(let s): return "tv_\(s.id.uuidString)"
+            case .book(let b): return "book_\(b.id.uuidString)"
+            case .game(let g): return "game_\(g.id.uuidString)"
+            case .volume(let v): return "volume_\(v.id.uuidString)"
+            }
+        }
+
+        var titleForScoring: String {
+            switch self {
+            case .movie(let m): return m.title
+            case .tv(let s): return s.name
+            case .book(let b): return b.title
+            case .game(let g): return g.name
+            case .volume(let v): return v.name
+            }
+        }
+    }
+
+    private var mixedMediaResults: [MediaItem] {
+        var items: [MediaItem] = []
+        if selectedCategories.contains(.movies) { items.append(contentsOf: movieResults.map(MediaItem.movie)) }
+        if selectedCategories.contains(.tv) { items.append(contentsOf: tvResults.map(MediaItem.tv)) }
+        if selectedCategories.contains(.books) { items.append(contentsOf: bookResults.map(MediaItem.book)) }
+        if selectedCategories.contains(.comics) { items.append(contentsOf: volumeResults.map(MediaItem.volume)) }
+        if selectedCategories.contains(.games) { items.append(contentsOf: gameResults.map(MediaItem.game)) }
+
+        return items.sorted { $0.titleForScoring.relevanceScore(to: searchQuery) > $1.titleForScoring.relevanceScore(to: searchQuery) }
+    }
+
+    private var mixedLibraryResults: [LibraryItem] {
+        var items: [LibraryItem] = []
+        if selectedCategories.contains(.movies) { items.append(contentsOf: ownedMovieResults.map(LibraryItem.movie)) }
+        if selectedCategories.contains(.tv) { items.append(contentsOf: ownedTVResults.map(LibraryItem.tv)) }
+        if selectedCategories.contains(.books) { items.append(contentsOf: ownedBookResults.map(LibraryItem.book)) }
+        if selectedCategories.contains(.comics) { items.append(contentsOf: ownedVolumeResults.map(LibraryItem.volume)) }
+        if selectedCategories.contains(.games) { items.append(contentsOf: ownedGameResults.map(LibraryItem.game)) }
+
+        return items.sorted { $0.titleForScoring.relevanceScore(to: searchQuery) > $1.titleForScoring.relevanceScore(to: searchQuery) }
+    }
+
     // Search mode (Media APIs or on-device Library)
     private enum Mode: String, CaseIterable, Identifiable {
         case media = "Media"
@@ -67,80 +158,42 @@ struct SearchView: View {
     @State private var ownedBookResults: [Book] = []
     @State private var ownedGameResults: [Game] = []
 
+    // Computed: Order categories by top match score
+    private var orderedCategories: [Category] {
+        let q = searchQuery
+        func topScore(for cat: Category) -> Int {
+            switch cat {
+            case .movies:
+                return (selectedMode == .media ? movieResults.first?.title : ownedMovieResults.first?.title)?.relevanceScore(to: q) ?? Int.min
+            case .tv:
+                return (selectedMode == .media ? tvResults.first?.name : ownedTVResults.first?.name)?.relevanceScore(to: q) ?? Int.min
+            case .books:
+                return (selectedMode == .media ? bookResults.first?.trackName : ownedBookResults.first?.title)?.relevanceScore(to: q) ?? Int.min
+            case .comics:
+                return (selectedMode == .media ? volumeResults.first?.title : ownedVolumeResults.first?.name)?.relevanceScore(to: q) ?? Int.min
+            case .games:
+                return (selectedMode == .media ? gameResults.first?.name : ownedGameResults.first?.name)?.relevanceScore(to: q) ?? Int.min
+            }
+        }
+
+        // Convert the selected set to an array, sort by descending score
+        return selectedCategories.sorted { topScore(for: $0) > topScore(for: $1) }
+    }
+
     var body: some View {
         NavigationStack {
             VStack {
-                Picker("Source", selection: $selectedMode) {
-                    ForEach(Mode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-
-                Group {
-                    let hasAnyResults: Bool = {
-                        if selectedMode == .media {
-                            return !movieResults.isEmpty || !tvResults.isEmpty || !bookResults.isEmpty || !gameResults.isEmpty
-                        } else {
-                            return !ownedMovieResults.isEmpty || !ownedTVResults.isEmpty || !ownedBookResults.isEmpty || !ownedGameResults.isEmpty
+                HStack {
+                    Picker("Source", selection: $selectedMode) {
+                        ForEach(Mode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
                         }
-                    }()
-
-                    if isSearching {
-                        ProgressView(selectedMode == .media ? "Searching databases…" : "Searching library…")
-                    } else if hasSearched {
-                        if !hasAnyResults {
-                            VStack(spacing: 8) {
-                                Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 32))
-                                    .foregroundStyle(.secondary)
-                                Text("No results for \"\(searchQuery)\"")
-                                    .font(.headline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        } else {
-                            ScrollView {
-                                LazyVStack(spacing: 12) {
-                                    if selectedCategories.contains(.movies) {
-                                        if selectedMode == .media {
-                                            ForEach(movieResults) { movieSearchResultRow($0, isSaved: savedMovieIDs.contains(String($0.id))) }
-                                        } else {
-                                            ForEach(ownedMovieResults) { libraryMovieRow($0) }
-                                        }
-                                    }
-                                    if selectedCategories.contains(.tv) {
-                                        if selectedMode == .media {
-                                            ForEach(tvResults) { tvShowSearchResultRow($0, isSaved: savedTVIDs.contains(String($0.id))) }
-                                        } else {
-                                            ForEach(ownedTVResults) { libraryTVShowRow($0) }
-                                        }
-                                    }
-                                    if selectedCategories.contains(.books) {
-                                        if selectedMode == .media {
-                                            ForEach(bookResults) { bookSearchResultRow($0, isSaved: savedBookIDs.contains(String($0.trackId))) }
-                                        } else {
-                                            ForEach(ownedBookResults) { libraryBookRow($0) }
-                                        }
-                                    }
-                                    if selectedCategories.contains(.games) {
-                                        if selectedMode == .media {
-                                            ForEach(gameResults) { gameSearchResultRow($0, isSaved: savedGameIDs.contains(String($0.id))) }
-                                        } else {
-                                            ForEach(ownedGameResults) { libraryGameRow($0) }
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-                        }
-                    } else {
-                        ContentUnavailableView("Search", systemImage: "magnifyingglass", description: Text(searchQuery.isEmpty ? "Start typing to search your media library…" : "Press enter to search…"))
                     }
-                }
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                    .pickerStyle(.segmented)
+
+                    Spacer(minLength: 8)
+
+                    // Category filter menu now lives next to the picker instead of the (broken) toolbar
                     Menu {
                         ForEach(Category.allCases) { cat in
                             Toggle(
@@ -159,9 +212,58 @@ struct SearchView: View {
                         }
                     } label: {
                         Image(systemName: "line.3.horizontal.decrease.circle")
+                            .imageScale(.large)
+                    }
+                }
+                .padding(.horizontal)
+
+                Group {
+                    let hasAnyResults: Bool = {
+                        if selectedMode == .media {
+                            return !movieResults.isEmpty || !tvResults.isEmpty || !bookResults.isEmpty || !gameResults.isEmpty || !volumeResults.isEmpty
+                        } else {
+                            return !ownedMovieResults.isEmpty || !ownedTVResults.isEmpty || !ownedBookResults.isEmpty || !ownedGameResults.isEmpty || !ownedVolumeResults.isEmpty
+                        }
+                    }()
+
+                    if isSearching {
+                        Spacer()
+                        ProgressView(selectedMode == .media ? "Searching..." : "Searching library...")
+                        Spacer()
+                    } else if hasSearched {
+                        if !hasAnyResults {
+                            Spacer()
+                            VStack(spacing: 8) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(.secondary)
+                                Text("No results for \"\(searchQuery)\"")
+                                    .font(.headline)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                            }
+                        } else {
+                            ScrollView {
+                                LazyVStack(spacing: 12) {
+                                    if selectedMode == .media {
+                                        ForEach(mixedMediaResults) { item in
+                                            mediaRow(for: item)
+                                        }
+                                    } else {
+                                        ForEach(mixedLibraryResults) { item in
+                                            libraryRow(for: item)
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
+                    } else {
+                        ContentUnavailableView("Search", systemImage: "magnifyingglass", description: Text(searchQuery.isEmpty ? "Start typing to search your media library…" : "Press enter to search…"))
                     }
                 }
             }
+            // Removed broken toolbar filter – now integrated next to the picker
             .navigationTitle("Search")
             .searchable(text: $searchQuery, prompt: "Search Media")
             .onSubmit(of: .search) {
@@ -177,10 +279,12 @@ struct SearchView: View {
                 tvResults = []
                 bookResults = []
                 gameResults = []
+                volumeResults = []
                 ownedMovieResults = []
                 ownedTVResults = []
                 ownedBookResults = []
                 ownedGameResults = []
+                ownedVolumeResults = []
             }
             // Preview sheet
             .sheet(isPresented: $showingPreview, onDismiss: refreshSavedCache) {
@@ -206,6 +310,12 @@ struct SearchView: View {
                     NavigationStack { GameView(game: details.toGame(), isPreview: true) }
                 }
             }
+            // Volume Preview
+            .sheet(isPresented: $showingVolumePreview, onDismiss: refreshSavedCache) {
+                if let details = selectedVolumeDetails {
+                    NavigationStack { VolumeView(volume: details.toVolume(), isPreview: true) }
+                }
+            }
             // Saved movie sheet
             .sheet(item: $presentingSavedMovie, onDismiss: refreshSavedCache) { movie in
                 NavigationStack { MovieView(movie: movie) }
@@ -221,6 +331,10 @@ struct SearchView: View {
             // Saved Game sheet
             .sheet(item: $presentingSavedGame, onDismiss: refreshSavedCache) { gm in
                 NavigationStack { GameView(game: gm) }
+            }
+            // Saved Volume sheet
+            .sheet(item: $presentingSavedVolume, onDismiss: refreshSavedCache) { vol in
+                NavigationStack { VolumeView(volume: vol) }
             }
         }
     }
@@ -309,10 +423,19 @@ struct SearchView: View {
             async let tvs = TMDBAPIManager.shared.searchTVShowResults(query: searchQuery)
             async let books = AppleBooksAPIManager.shared.searchBooks(term: searchQuery)
             async let games = IGDBAPIManager.shared.searchGameResults(query: searchQuery)
-            self.movieResults = try await movies
-            self.tvResults = try await tvs
-            self.bookResults = try await books
-            self.gameResults = try await games
+            async let volumes = ComicVineAPIManager.shared.searchVolumes(query: searchQuery)
+
+            let unsortedMovies = try await movies
+            let unsortedTVs = try await tvs
+            let unsortedBooks = try await books
+            let unsortedGames = try await games
+            let unsortedVolumes = try await volumes
+
+            self.movieResults = unsortedMovies.sorted { $0.title.relevanceScore(to: searchQuery) > $1.title.relevanceScore(to: searchQuery) }
+            self.tvResults = unsortedTVs.sorted { $0.name.relevanceScore(to: searchQuery) > $1.name.relevanceScore(to: searchQuery) }
+            self.bookResults = unsortedBooks.sorted { ($0.trackName ?? "").relevanceScore(to: searchQuery) > ($1.trackName ?? "").relevanceScore(to: searchQuery) }
+            self.gameResults = unsortedGames.sorted { ($0.name ?? "").relevanceScore(to: searchQuery) > ($1.name ?? "").relevanceScore(to: searchQuery) }
+            self.volumeResults = unsortedVolumes.sorted { $0.title.relevanceScore(to: searchQuery) > $1.title.relevanceScore(to: searchQuery) }
 
             // Update saved cache sets
             let existingMovies = (try? modelContext.fetch(FetchDescriptor<Movie>())) ?? []
@@ -346,6 +469,12 @@ struct SearchView: View {
             var gameDict: [String: Game] = [:]
             for gm in existingGames { if let id = gm.igdbId { gameDict[id] = gm } }
             savedGamesByID = gameDict
+
+            let existingVolumes = (try? modelContext.fetch(FetchDescriptor<Volume>())) ?? []
+            savedVolumeIDs = Set(existingVolumes.compactMap { $0.comicVineId.map(String.init) })
+            var volDict: [String: Volume] = [:]
+            for v in existingVolumes { if let id = v.comicVineId { volDict[String(id)] = v } }
+            savedVolumesByID = volDict
 
             self.isSearching = false
             self.hasSearched = true
@@ -435,6 +564,32 @@ struct SearchView: View {
         }
     }
 
+    private func selectVolume(_ result: ComicVineVolumeSearchResult, isSaved: Bool) {
+        let idStr = String(result.id)
+        if let existing = savedVolumesByID[idStr] {
+            presentingSavedVolume = existing
+        } else {
+            isLoadingMovieDetails = true
+            Task {
+                do {
+                    let details = try await ComicVineAPIManager.shared.getVolume(id: result.id)
+                    await MainActor.run {
+                        self.selectedVolumeDetails = details
+                        self.isLoadingMovieDetails = false
+                        self.showingVolumePreview = true
+                    }
+                } catch {
+                    if error is CancellationError { return }
+                    await MainActor.run {
+                        self.errorMessage = error.localizedDescription
+                        self.showingError = true
+                        self.isLoadingMovieDetails = false
+                    }
+                }
+            }
+        }
+    }
+
     private func selectGame(_ result: IGDBGameSearchResult, isSaved: Bool) {
         let idStr = String(result.id)
         if let existing = savedGamesByID[idStr] {
@@ -485,6 +640,12 @@ struct SearchView: View {
         var gDict: [String: Game] = [:]
         for g in existingGames { if let id = g.igdbId { gDict[id] = g } }
         savedGamesByID = gDict
+
+        let existingVolumes = (try? modelContext.fetch(FetchDescriptor<Volume>())) ?? []
+        savedVolumeIDs = Set(existingVolumes.compactMap { $0.comicVineId.map(String.init) })
+        var vDict: [String: Volume] = [:]
+        for v in existingVolumes { if let id = v.comicVineId { vDict[String(id)] = v } }
+        savedVolumesByID = vDict
     }
 
     // MARK: – Library Helpers
@@ -553,6 +714,7 @@ struct SearchView: View {
         if selectedCategories.contains(.movies) {
             let all = (try? modelContext.fetch(FetchDescriptor<Movie>())) ?? []
             ownedMovieResults = all.filter { $0.title.localizedCaseInsensitiveContains(trimmed) }
+                .sorted { $0.title.relevanceScore(to: trimmed) > $1.title.relevanceScore(to: trimmed) }
         } else {
             ownedMovieResults = []
         }
@@ -560,6 +722,7 @@ struct SearchView: View {
         if selectedCategories.contains(.tv) {
             let all = (try? modelContext.fetch(FetchDescriptor<TVShow>())) ?? []
             ownedTVResults = all.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
+                .sorted { $0.name.relevanceScore(to: trimmed) > $1.name.relevanceScore(to: trimmed) }
         } else {
             ownedTVResults = []
         }
@@ -567,15 +730,73 @@ struct SearchView: View {
         if selectedCategories.contains(.books) {
             let all = (try? modelContext.fetch(FetchDescriptor<Book>())) ?? []
             ownedBookResults = all.filter { $0.title.localizedCaseInsensitiveContains(trimmed) || $0.author.localizedCaseInsensitiveContains(trimmed) }
+                .sorted { $0.title.relevanceScore(to: trimmed) > $1.title.relevanceScore(to: trimmed) }
         } else {
             ownedBookResults = []
+        }
+
+        if selectedCategories.contains(.comics) {
+            let all = (try? modelContext.fetch(FetchDescriptor<Volume>())) ?? []
+            ownedVolumeResults = all.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
+                .sorted { $0.name.relevanceScore(to: trimmed) > $1.name.relevanceScore(to: trimmed) }
+        } else {
+            ownedVolumeResults = []
         }
 
         if selectedCategories.contains(.games) {
             let all = (try? modelContext.fetch(FetchDescriptor<Game>())) ?? []
             ownedGameResults = all.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
+                .sorted { $0.name.relevanceScore(to: trimmed) > $1.name.relevanceScore(to: trimmed) }
         } else {
             ownedGameResults = []
+        }
+
+        // ensure ownedVolumeResults cleared if not needed above
+    }
+
+    // MARK: – Volume Rows
+    private func volumeSearchResultRow(_ result: ComicVineVolumeSearchResult, isSaved: Bool) -> some View {
+        Button(action: { selectVolume(result, isSaved: isSaved) }) {
+            searchRowThumbnail(url: result.thumbnailURL, title: result.title, subtitle: subtitleVolume(result), trailingIcon: isSaved ? "checkmark.circle.fill" : "chevron.right", iconColor: isSaved ? .green : .secondary)
+        }.buttonStyle(.plain)
+    }
+
+    private func libraryVolumeRow(_ volume: Volume) -> some View {
+        Button(action: { presentingSavedVolume = volume }) {
+            searchRowThumbnail(url: volume.thumbnailURL, title: volume.name, subtitle: subtitleOwnedVolume(volume), trailingIcon: "chevron.right", iconColor: .secondary)
+        }.buttonStyle(.plain)
+    }
+
+    private func subtitleVolume(_ result: ComicVineVolumeSearchResult) -> String {
+        var parts: [String] = ["Comic Volume"]
+        if let year = result.startYear { parts.append(String(year)) }
+        return parts.joined(separator: " • ")
+    }
+
+    private func subtitleOwnedVolume(_ volume: Volume) -> String {
+        var parts: [String] = ["Comic Volume"]
+        if let year = volume.startYear { parts.append(String(year)) }
+        return parts.joined(separator: " • ")
+    }
+
+    // MARK: – Row builders for unified lists
+    @ViewBuilder private func mediaRow(for item: MediaItem) -> some View {
+        switch item {
+        case .movie(let res): movieSearchResultRow(res, isSaved: savedMovieIDs.contains(String(res.id)))
+        case .tv(let res): tvShowSearchResultRow(res, isSaved: savedTVIDs.contains(String(res.id)))
+        case .book(let res): bookSearchResultRow(res, isSaved: savedBookIDs.contains(String(res.trackId)))
+        case .game(let res): gameSearchResultRow(res, isSaved: savedGameIDs.contains(String(res.id)))
+        case .volume(let res): volumeSearchResultRow(res, isSaved: savedVolumeIDs.contains(String(res.id)))
+        }
+    }
+
+    @ViewBuilder private func libraryRow(for item: LibraryItem) -> some View {
+        switch item {
+        case .movie(let m): libraryMovieRow(m)
+        case .tv(let t): libraryTVShowRow(t)
+        case .book(let b): libraryBookRow(b)
+        case .game(let g): libraryGameRow(g)
+        case .volume(let v): libraryVolumeRow(v)
         }
     }
 }

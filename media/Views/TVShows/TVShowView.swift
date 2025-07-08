@@ -80,9 +80,26 @@ struct TVShowView: View {
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                             }
-                            
-                            if let status = tvShow.status {
-                                Label(status, systemImage: "info.circle")
+                            if let tmdbRating = tvShow.tmdbRating {
+                                Label {
+                                    Text("TMDB: \(tmdbRating * 10, specifier: "%.0f%%")")
+                                } icon: {
+                                    Image(systemName: "star.circle.fill")
+                                }
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            }
+                            if let rating = tvShow.rating {
+                                Label {
+                                    Text("Personal: \(rating * 10, specifier: "%.0f%%")")
+                                } icon: {
+                                    Image(systemName: "star.circle.fill")
+                                }
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            }
+                            if let creators = tvShow.creators {
+                                Label(creators, systemImage: "person")
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
@@ -103,6 +120,7 @@ struct TVShowView: View {
                             .font(.body)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
                     .background(.regularMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -163,72 +181,6 @@ struct TVShowView: View {
                     .background(.regularMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 8)) 
                 }
-                
-                // Additional Details
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Details")
-                        .font(.headline)
-                    
-                    VStack(spacing: 8) {
-                        HStack {
-                            Text("Added:")
-                            Spacer()
-                            Text(tvShow.created, format: .dateTime.day().month().year())
-                        }
-                        
-                        if tvShow.updated != tvShow.created {
-                            HStack {
-                                Text("Updated:")
-                                Spacer()
-                                Text(tvShow.updated, format: .dateTime.day().month().year())
-                            }
-                        }
-                        
-                        if let tmdbId = tvShow.tmdbId {
-                            HStack {
-                                Text("TMDB ID:")
-                                Spacer()
-                                Text(tmdbId)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        
-                        if let userRating = tvShow.rating {
-                            HStack {
-                                Text("Your Rating:")
-                                Spacer()
-                                Text("⭐ \(userRating, specifier: "%.1f")")
-                            }
-                        }
-
-                        if let apiRating = tvShow.tmdbRating {
-                            HStack {
-                                Text("TMDB Rating:")
-                                Spacer()
-                                Text("⭐ \(apiRating, specifier: "%.1f")")
-                            }
-                        }
-
-                        if let seasons = tvShow.numberOfSeasons {
-                            HStack {
-                                Text("Seasons:")
-                                Spacer()
-                                Text("\(seasons)")
-                            }
-                        }
-
-                        if let episodes = tvShow.numberOfEpisodes {
-                            HStack {
-                                Text("Episodes:")
-                                Spacer()
-                                Text("\(episodes)")
-                            }
-                        }
-                    }
-                }
-                .padding()
-                .background(.regularMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
 
                 // Backdrop
                 ZStack(alignment: .bottomLeading) {
@@ -254,12 +206,9 @@ struct TVShowView: View {
         }
         .toolbar {
             if isPreview {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(action: { dismiss() }) { Image(systemName: "xmark") } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        modelContext.insert(tvShow)
-                        dismiss()
-                    }
+                    Button(action: { modelContext.insert(tvShow); dismiss() }) { Image(systemName: "plus") }
                 }
             } else {
                 // Delete TV show toolbar button

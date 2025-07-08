@@ -33,9 +33,7 @@ class IGDBAPIManager: ObservableObject {
     }
     
     private func fetchAccessToken() async throws -> String {
-        print("🎮 IGDBAPIManager: Fetching new access token…")
         guard !clientID.isEmpty, !clientSecret.isEmpty else {
-            print("❌ IGDBAPIManager: Missing client ID or client secret")
             throw IGDBError.missingCredentials
         }
         
@@ -56,7 +54,6 @@ class IGDBAPIManager: ObservableObject {
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            print("❌ IGDBAPIManager: Failed to fetch token, HTTP status ≠ 200")
             throw IGDBError.networkError
         }
         
@@ -65,7 +62,6 @@ class IGDBAPIManager: ObservableObject {
         accessToken = decoded.access_token
         tokenExpiration = Date(timeIntervalSinceNow: TimeInterval(decoded.expires_in))
         
-        print("✅ IGDBAPIManager: Received access token, valid for \(decoded.expires_in) seconds")
         return decoded.access_token
     }
     
@@ -88,7 +84,6 @@ class IGDBAPIManager: ObservableObject {
     
     // MARK: - Game Search
     func searchGames(query: String, limit: Int = 20) async throws -> [IGDBGameSearchResult] {
-        print("🎮 IGDBAPIManager: Searching games for query ‘\(query)’…")
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
         let escapedQuery = query.replacingOccurrences(of: "\"", with: "\\\"")
         let body = "search \"" + escapedQuery + "\"; fields name,cover.image_id,platforms.name,first_release_date,genres.name,summary; limit \(limit);"
@@ -100,10 +95,8 @@ class IGDBAPIManager: ObservableObject {
                 throw IGDBError.networkError
             }
             let results = try JSONDecoder().decode([IGDBGameSearchResult].self, from: data)
-            print("✅ IGDBAPIManager: Decoded \(results.count) game search results")
             return results
         } catch {
-            print("💥 IGDBAPIManager: Search failed with error: \(error)")
             throw error
         }
     }
@@ -115,7 +108,6 @@ class IGDBAPIManager: ObservableObject {
     
     // MARK: - Get Game Details
     func getGame(id: Int) async throws -> IGDBGameDetails {
-        print("🎮 IGDBAPIManager: Fetching game details for id=\(id)")
         let body = "fields name,cover.image_id,platforms.name,first_release_date,genres.name,summary; where id = \(id); limit 1;"
         let request = try await createRequest(endpoint: "/games", body: body)
         

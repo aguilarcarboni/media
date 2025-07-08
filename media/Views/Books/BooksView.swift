@@ -17,6 +17,8 @@ struct BooksView: View {
         case all = "All"
         case read = "Read"
         case unread = "Unread"
+        case rated = "Rated"
+        case unrated = "Unrated"
         var id: Self { self }
     }
     
@@ -28,6 +30,8 @@ struct BooksView: View {
         case titleZA = "Title Z-A"
         case yearNewest = "Year Newest"
         case yearOldest = "Year Oldest"
+        case ratingHighLow = "Rating High-Low"
+        case ratingLowHigh = "Rating Low-High"
 
         var id: Self { self }
     }
@@ -41,6 +45,8 @@ struct BooksView: View {
                 case .all: return true
                 case .read: return book.read
                 case .unread: return !book.read
+                case .rated: return book.rating != nil
+                case .unrated: return book.rating == nil
                 }
             }
             .filter { bk in
@@ -58,6 +64,14 @@ struct BooksView: View {
                     return (lhs.year ?? 0) > (rhs.year ?? 0)
                 case .yearOldest:
                     return (lhs.year ?? 0) < (rhs.year ?? 0)
+                case .ratingHighLow:
+                    let lhsRating = lhs.rating ?? -1
+                    let rhsRating = rhs.rating ?? -1
+                    return lhsRating > rhsRating
+                case .ratingLowHigh:
+                    let lhsRating = lhs.rating ?? Double.greatestFiniteMagnitude
+                    let rhsRating = rhs.rating ?? Double.greatestFiniteMagnitude
+                    return lhsRating < rhsRating
                 }
             }
     }
@@ -140,6 +154,9 @@ struct BookRowView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if let year = book.year { Text(String(year)).font(.caption).foregroundStyle(.secondary) }
+                if let rating = book.rating {
+                    Text(String(format: "%.1f", rating)).font(.caption).foregroundStyle(.secondary)
+                }
             }
             Spacer()
             Button(action: {

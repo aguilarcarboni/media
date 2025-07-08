@@ -61,7 +61,7 @@ struct MovieView: View {
 
                             if movie.rating != nil {
                                 Label {
-                                    Text("Personal: \(movie.rating!, specifier: "%.1f")")
+                                    Text("Personal: \(movie.rating! * 10, specifier: "%.0f%%")")
                                 } icon: {
                                     Image(systemName: "star.circle.fill")
                                 }
@@ -71,7 +71,7 @@ struct MovieView: View {
 
                             if movie.tmdbRating != nil {
                                 Label {
-                                    Text("TMDB: \(movie.tmdbRating!, specifier: "%.1f")")
+                                    Text("TMDB: \(movie.tmdbRating! * 10, specifier: "%.0f%%")")
                                 } icon: {
                                     Image(systemName: "star.circle.fill")
                                 }
@@ -185,13 +185,13 @@ struct MovieView: View {
         .toolbar {
             if isPreview {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(action: { dismiss() }) { Image(systemName: "xmark") }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
+                    Button(action: {
                         modelContext.insert(movie)
                         dismiss()
-                    }
+                    }) { Image(systemName: "plus") }
                 }
             } else {
                 // Delete movie toolbar button
@@ -260,15 +260,19 @@ struct MovieView: View {
                 .navigationTitle("Rate Movie")
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") {
+                        Button(action: {
                             showingRatingSheet = false
+                        }) {
+                            Image(systemName: "xmark")
                         }
                     }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") {
+                        Button(action: {
                             movie.rating = tempRating
                             movie.updated = Date()
                             showingRatingSheet = false
+                        }) {
+                            Image(systemName: "checkmark")
                         }
                     }
                 }

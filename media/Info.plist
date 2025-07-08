@@ -30,5 +30,10 @@
 			</dict>
 		</dict>
 	</dict>
+	<!-- Enable remote notifications for CloudKit -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

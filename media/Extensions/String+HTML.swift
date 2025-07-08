@@ -23,6 +23,16 @@ extension String {
     
     /// Returns plain text stripped of HTML tags & entities.
     var htmlStripped: String {
-        return htmlAttributed?.description ?? self.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression, range: nil)
+        guard let data = self.data(using: .utf8) else {
+            return self
+        }
+        if let nsAttr = try? NSAttributedString(data: data,
+                                               options: [.documentType: NSAttributedString.DocumentType.html,
+                                                         .characterEncoding: String.Encoding.utf8.rawValue],
+                                               documentAttributes: nil) {
+            return nsAttr.string
+        }
+        // Fallback: crude regex tag removal
+        return self.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression, range: nil)
     }
 } 

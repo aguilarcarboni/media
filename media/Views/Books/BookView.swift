@@ -30,7 +30,7 @@ struct BookView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // Cover and quick details card
+                // Cover and quick details header (no background card)
                 HStack(alignment: .top, spacing: 16) {
                     // Cover
                     AsyncImage(url: book.coverURL) { img in
@@ -51,15 +51,6 @@ struct BookView: View {
 
                     // Details
                     VStack(alignment: .leading, spacing: 12) {
-                        // Read status
-                        HStack {
-                            Image(systemName: book.read ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(book.read ? .green : .secondary)
-                                .font(.title2)
-                            Text(book.read ? "Read" : "Not Read")
-                                .font(.headline)
-                                .foregroundStyle(book.read ? .green : .secondary)
-                        }
 
                         // Quick details
                         VStack(alignment: .leading, spacing: 6) {
@@ -89,10 +80,24 @@ struct BookView: View {
                                 .foregroundStyle(.secondary)
                             }
 
-                            if let rating = book.displayRating {
-                                Text("⭐ \(rating, specifier: "%.1f")")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                            if let appleRating = book.appleRating {
+                                Label {
+                                    Text("Apple: \(appleRating * 10, specifier: "%.0f%%")")
+                                } icon: {
+                                    Image(systemName: "star.circle.fill")
+                                }
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            }
+
+                            if let rating = book.rating {
+                                Label {
+                                    Text("Personal: \(rating * 10, specifier: "%.0f%%")")
+                                } icon: {
+                                    Image(systemName: "star.circle.fill")
+                                }
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                             }
                         }
 
@@ -101,9 +106,7 @@ struct BookView: View {
 
                     Spacer()
                 }
-                .padding()
-                .background(.regularMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                // Header now matches design without card background
 
                 // Synopsis
                 if let synopsis = book.synopsis, !synopsis.isEmpty {
@@ -139,6 +142,26 @@ struct BookView: View {
                 .background(.regularMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
 
+                // Backdrop / Cover image (matches MovieView/TVShowView layout)
+                ZStack(alignment: .bottomLeading) {
+                    AsyncImage(url: book.coverURL) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(.secondary.opacity(0.3))
+                            .overlay {
+                                Image(systemName: "book")
+                                    .font(.system(size: 48))
+                                    .foregroundStyle(.secondary)
+                            }
+                    }
+                    .frame(height: 200)
+                    .clipped()
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
                 Spacer()
             }
             .padding()
@@ -147,13 +170,13 @@ struct BookView: View {
             if isPreview {
                 // Preview mode: Cancel / Add buttons
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(action: { dismiss() }) { Image(systemName: "xmark") }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
+                    Button(action: {
                         modelContext.insert(book)
                         dismiss()
-                    }
+                    }) { Image(systemName: "plus") }
                 }
             } else {
                 // Existing toolbar when the book is already saved
@@ -223,8 +246,6 @@ struct BookView: View {
                 await MainActor.run {
                     book.updateFromAppleBooks(details)
                 }
-            } catch {
-                print("Failed to refresh from Apple Books: \(error)")
             }
         }
     }
