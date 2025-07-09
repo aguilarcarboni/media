@@ -185,11 +185,6 @@ struct MovieRowView: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
-                    if let rating = movie.rating {
-                        Text(String(format: "%.1f", rating))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
                 }
             }
             

@@ -347,30 +347,45 @@ struct VolumeView: View {
             let existingComics: [Comic] = (try? modelContext.fetch(FetchDescriptor<Comic>())) ?? []
             let existingIds: Set<Int> = Set(existingComics.compactMap { $0.comicVineId })
 
-            for issue in issueResults {
-                // Skip if already stored
-                if existingIds.contains(issue.id) { continue }
-
-                do {
-                    // Fetch detailed info to capture creators, characters, etc.
-                    let details = try await ComicVineAPIManager.shared.getIssue(id: issue.id)
-                    var comic = details.toComic()
-                    comic.volume = volume // establish relationship
-                    modelContext.insert(comic)
-                } catch {
-                    // Fallback to lightweight version if details fail
-                    let comic = Comic(
-                        comicVineId: issue.id,
-                        title: issue.title,
-                        issueNumber: issue.issueNumber,
-                        seriesName: volume.name,
-                        publicationDate: issue.year.map { String($0) },
-                        synopsis: issue.overview,
-                        thumbnailURLString: issue.thumbnailURL?.absoluteString,
-                        volume: volume
-                    )
-                    modelContext.insert(comic)
+            // --- NEW: Fetch detailed info for all missing issues in parallel ---
+            var fetchedDetails: [ComicVineIssueDetails] = []
+            try await withThrowingTaskGroup(of: ComicVineIssueDetails?.self) { group in
+                for issue in issueResults where !existingIds.contains(issue.id) {
+                    group.addTask {
+                        do {
+                            return try await ComicVineAPIManager.shared.getIssue(id: issue.id)
+                        } catch {
+                            // Swallow individual failures – we"ll fall back to lightweight insert later
+                            return nil
+                        }
+                    }
                 }
+                for try await details in group {
+                    if let details { fetchedDetails.append(details) }
+                }
+            }
+
+            // Insert comics with full details
+            for details in fetchedDetails {
+                var comic = details.toComic()
+                comic.volume = volume
+                modelContext.insert(comic)
+            }
+
+            // Fallback: insert lightweight comics for any issue we didn"t get full details for
+            let detailedIds = Set(fetchedDetails.map { $0.id })
+            for issue in issueResults where !existingIds.contains(issue.id) && !detailedIds.contains(issue.id) {
+                let comic = Comic(
+                    comicVineId: issue.id,
+                    title: issue.title,
+                    issueNumber: issue.issueNumber,
+                    seriesName: volume.name,
+                    publicationDate: issue.year.map { String($0) },
+                    synopsis: issue.overview,
+                    thumbnailURLString: issue.thumbnailURL?.absoluteString,
+                    volume: volume
+                )
+                modelContext.insert(comic)
             }
 
             // Persist all newly inserted comics

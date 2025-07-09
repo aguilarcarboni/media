@@ -68,7 +68,7 @@ final class Book: Identifiable {
     func updateFromAppleBooks(_ details: AppleBookDetails) {
         self.title = details.trackName ?? ""
         self.author = details.artistName ?? ""
-        self.appleRating = details.averageUserRating
+        self.appleRating = details.averageUserRating.map { $0 * 2 }
         self.coverURLString = details.artworkUrl100
         self.year = details.year
         if let releaseISO = details.releaseDate, let date = ISO8601DateFormatter().date(from: releaseISO) { self.releaseDate = date }

@@ -137,7 +137,6 @@ private struct VolumeRowView: View {
                 Text(volume.name).font(.headline)
                 HStack {
                     if let year = volume.startYear { Text(String(year)).font(.caption).foregroundStyle(.secondary) }
-                    if let issues = volume.countOfIssues { Text("• #\(issues) issues").font(.caption).foregroundStyle(.secondary) }
                 }
             }
             Spacer()

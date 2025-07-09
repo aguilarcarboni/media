@@ -8,6 +8,8 @@
 import SwiftUI
 import SwiftData
 
+// EpisodeView reference
+
 struct TVShowView: View {
     @Bindable var tvShow: TVShow
     var isPreview: Bool = false
@@ -23,6 +25,11 @@ struct TVShowView: View {
     @State private var isLoadingEpisodes: Bool = false
     @State private var episodeErrorMessage: String = ""
     @State private var showEpisodeError: Bool = false
+
+    // Episode selection state
+    @State private var presentingSavedEpisode: Episode?
+    @State private var selectedTMDBEpisode: TMDBEpisode?
+    @State private var showingEpisodePreview = false
     
     // Custom initializer to configure state values
     init(tvShow: TVShow, isPreview: Bool = false) {
@@ -164,16 +171,19 @@ struct TVShowView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Episodes (") + Text(String(episodeResults.count)) + Text(")").font(.headline)
                         ForEach(episodeResults.prefix(20), id: \.id) { ep in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("S\(ep.seasonNumber)E\(ep.episodeNumber) • \(ep.name)")
-                                    .font(.subheadline)
-                                if let air = ep.airDate {
-                                    Text(air)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                            Button(action: { selectEpisode(ep) }) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("S\(ep.seasonNumber)E\(ep.episodeNumber) • \(ep.name)")
+                                        .font(.subheadline)
+                                    if let air = ep.airDate {
+                                        Text(air)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .buttonStyle(.plain)
                         }
                         if episodeResults.count > 20 {
                             Text("Showing first 20 episodes")
@@ -306,6 +316,26 @@ struct TVShowView: View {
             Text("This action cannot be undone.")
         }
         .alert("Error", isPresented: $showEpisodeError) { Button("OK") {} } message: { Text(episodeErrorMessage) }
+        // Episode sheets
+        .sheet(item: $presentingSavedEpisode) { ep in
+            NavigationStack { EpisodeView(episode: ep) }
+        }
+        .sheet(isPresented: $showingEpisodePreview) {
+            if let epDetails = selectedTMDBEpisode {
+                let previewEpisode = Episode(
+                    tmdbId: epDetails.id,
+                    name: epDetails.name,
+                    overview: epDetails.overview,
+                    seasonNumber: epDetails.seasonNumber,
+                    episodeNumber: epDetails.episodeNumber,
+                    airDate: epDetails.airDate,
+                    runtime: epDetails.runtime,
+                    tmdbRating: epDetails.voteAverage,
+                    stillPath: epDetails.stillPath
+                )
+                NavigationStack { EpisodeView(episode: previewEpisode, isPreview: true) }
+            }
+        }
         .task(id: tvShow.tmdbId) {
             await loadEpisodes()
         }
@@ -367,7 +397,7 @@ struct TVShowView: View {
                     episodeNumber: ep.episodeNumber,
                     airDate: ep.airDate,
                     runtime: ep.runtime,
-                    rating: ep.voteAverage,
+                    tmdbRating: ep.voteAverage,
                     stillPath: ep.stillPath,
                     tvShow: tvShow
                 )
@@ -376,6 +406,16 @@ struct TVShowView: View {
             try? modelContext.save()
         } catch {
             // ignore episode save errors
+        }
+    }
+
+    private func selectEpisode(_ ep: TMDBEpisode) {
+        let idInt = ep.id
+        if let existing = try? modelContext.fetch(FetchDescriptor<Episode>(predicate: #Predicate { $0.tmdbId == idInt })).first {
+            presentingSavedEpisode = existing
+        } else {
+            selectedTMDBEpisode = ep
+            showingEpisodePreview = true
         }
     }
 } 

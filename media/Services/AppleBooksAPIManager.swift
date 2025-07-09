@@ -12,7 +12,7 @@ class AppleBooksAPIManager: ObservableObject {
     private init() {}
     
     // MARK: - Book Search
-    func searchBooks(term: String, limit: Int = 25, country: String? = nil) async throws -> [AppleBookSearchResult] {
+    func searchBooks(term: String, limit: Int = 25, offset: Int = 0, country: String? = nil) async throws -> [AppleBookSearchResult] {
         let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
         guard var components = URLComponents(string: baseSearchURL) else { throw AppleBooksError.invalidURL }
@@ -20,7 +20,8 @@ class AppleBooksAPIManager: ObservableObject {
             URLQueryItem(name: "media", value: "ebook"),
             URLQueryItem(name: "term", value: trimmed),
             URLQueryItem(name: "country", value: country ?? defaultCountry),
-            URLQueryItem(name: "limit", value: String(limit))
+            URLQueryItem(name: "limit", value: String(limit)),
+            URLQueryItem(name: "offset", value: String(offset))
         ]
         guard let url = components.url else { throw AppleBooksError.invalidURL }
         var request = URLRequest(url: url)

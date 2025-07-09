@@ -65,6 +65,13 @@ struct GameView: View {
                                     .foregroundStyle(.secondary)
                             }
 
+                            // Year (if available)
+                            if let year = game.year {
+                                Label(String(year), systemImage: "calendar")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+
                             if let releaseDate = game.releaseDate {
                                 Label {
                                     Text(releaseDate, format: .dateTime.day().month().year())
@@ -108,6 +115,46 @@ struct GameView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Summary").font(.headline)
                         Text(summary).font(.body)
+                    }
+                    .padding()
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+
+                // Platforms list as chips
+                if !game.platformList.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Platforms").font(.headline)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 8) {
+                            ForEach(game.platformList, id: \.self) { platform in
+                                Text(platform)
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(.regularMaterial)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+
+                // Genres list as chips
+                if !game.genreList.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Genres").font(.headline)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 8) {
+                            ForEach(game.genreList, id: \.self) { genre in
+                                Text(genre)
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(.regularMaterial)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+                        }
                     }
                     .padding()
                     .background(.regularMaterial)

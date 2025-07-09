@@ -155,12 +155,6 @@ struct GameRowView: View {
                     if let year = game.year {
                         Text(String(year)).font(.caption).foregroundStyle(.secondary)
                     }
-                    if !game.platformList.isEmpty {
-                        Text("\(game.platformList.joined(separator: ", "))").font(.caption).foregroundStyle(.secondary)
-                    }
-                    if let rating = game.rating {
-                        Text(String(format: "%.1f", rating)).font(.caption).foregroundStyle(.secondary)
-                    }
                 }
             }
             Spacer()

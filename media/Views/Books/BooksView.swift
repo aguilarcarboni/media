@@ -154,9 +154,6 @@ struct BookRowView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if let year = book.year { Text(String(year)).font(.caption).foregroundStyle(.secondary) }
-                if let rating = book.rating {
-                    Text(String(format: "%.1f", rating)).font(.caption).foregroundStyle(.secondary)
-                }
             }
             Spacer()
             Button(action: {

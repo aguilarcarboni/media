@@ -83,10 +83,10 @@ class IGDBAPIManager: ObservableObject {
     }
     
     // MARK: - Game Search
-    func searchGames(query: String, limit: Int = 20) async throws -> [IGDBGameSearchResult] {
+    func searchGames(query: String, limit: Int = 20, offset: Int = 0) async throws -> [IGDBGameSearchResult] {
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
         let escapedQuery = query.replacingOccurrences(of: "\"", with: "\\\"")
-        let body = "search \"" + escapedQuery + "\"; fields name,cover.image_id,platforms.name,first_release_date,genres.name,summary; limit \(limit);"
+        let body = "search \"" + escapedQuery + "\"; fields name,cover.image_id,platforms.name,first_release_date,genres.name,summary; limit \(limit); offset \(offset);"
         let request = try await createRequest(endpoint: "/games", body: body)
         
         do {
@@ -102,8 +102,8 @@ class IGDBAPIManager: ObservableObject {
     }
     
     // Convenience method to get just the first page of results that map to local Game model (if created in the future)
-    func searchGameResults(query: String, limit: Int = 20) async throws -> [IGDBGameSearchResult] {
-        return try await searchGames(query: query, limit: limit)
+    func searchGameResults(query: String, limit: Int = 20, offset: Int = 0) async throws -> [IGDBGameSearchResult] {
+        return try await searchGames(query: query, limit: limit, offset: offset)
     }
     
     // MARK: - Get Game Details

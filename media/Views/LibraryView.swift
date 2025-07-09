@@ -55,7 +55,7 @@ struct LibraryView: View {
                 case .movies:
                     MoviesView()
                 case .tvShows:
-                    TVShowsView()
+                    TVGeneralView()
                 case .games:
                     GamesView()
                 case .books:

@@ -65,6 +65,14 @@ struct SearchView: View {
     // Owned volumes results for library search
     @State private var ownedVolumeResults: [Volume] = []
 
+    // Add pagination state for Media search
+    @State private var moviePage: Int = 1
+    @State private var tvPage: Int = 1
+    @State private var bookOffset: Int = 0
+    @State private var gameOffset: Int = 0
+    @State private var volumeOffset: Int = 0
+    @State private var isLoadingMore: Bool = false
+
     // MARK: – Unified result wrappers
     private enum MediaItem: Identifiable {
         case movie(TMDBMovieSearchResult)
@@ -234,6 +242,7 @@ struct SearchView: View {
                         if !hasAnyResults {
                             Spacer()
                             VStack(spacing: 8) {
+                                Spacer()
                                 Image(systemName: "magnifyingglass")
                                     .font(.system(size: 32))
                                     .foregroundStyle(.secondary)
@@ -246,8 +255,13 @@ struct SearchView: View {
                             ScrollView {
                                 LazyVStack(spacing: 12) {
                                     if selectedMode == .media {
-                                        ForEach(mixedMediaResults) { item in
+                                        ForEach(Array(mixedMediaResults.enumerated()), id: \.element.id) { index, item in
                                             mediaRow(for: item)
+                                                .onAppear {
+                                                    if index == mixedMediaResults.count - 1 {
+                                                        Task { await loadMoreResultsIfNeeded() }
+                                                    }
+                                                }
                                         }
                                     } else {
                                         ForEach(mixedLibraryResults) { item in
@@ -285,6 +299,13 @@ struct SearchView: View {
                 ownedBookResults = []
                 ownedGameResults = []
                 ownedVolumeResults = []
+
+                // Reset pagination trackers
+                moviePage = 1
+                tvPage = 1
+                bookOffset = 0
+                gameOffset = 0
+                volumeOffset = 0
             }
             // Preview sheet
             .sheet(isPresented: $showingPreview, onDismiss: refreshSavedCache) {
@@ -478,6 +499,12 @@ struct SearchView: View {
 
             self.isSearching = false
             self.hasSearched = true
+            // Reset pagination counters
+            self.moviePage = 1
+            self.tvPage = 1
+            self.bookOffset = unsortedBooks.count
+            self.gameOffset = unsortedGames.count
+            self.volumeOffset = unsortedVolumes.count
         } catch {
             if error is CancellationError { return }
             self.errorMessage = error.localizedDescription
@@ -797,6 +824,79 @@ struct SearchView: View {
         case .book(let b): libraryBookRow(b)
         case .game(let g): libraryGameRow(g)
         case .volume(let v): libraryVolumeRow(v)
+        }
+    }
+
+    // MARK: – Pagination Loader
+    @MainActor private func loadMoreResultsIfNeeded() async {
+        guard selectedMode == .media else { return }
+        guard !isLoadingMore else { return }
+        isLoadingMore = true
+
+        defer { isLoadingMore = false }
+
+        // Movies
+        if selectedCategories.contains(.movies) {
+            let nextPage = moviePage + 1
+            do {
+                let extra = try await TMDBAPIManager.shared.searchMovieResults(query: searchQuery, page: nextPage)
+                if !extra.isEmpty {
+                    movieResults.append(contentsOf: extra)
+                    moviePage = nextPage
+                }
+            } catch { /* Ignore pagination errors */ }
+        }
+
+        // TV Shows
+        if selectedCategories.contains(.tv) {
+            let nextPage = tvPage + 1
+            do {
+                let extra = try await TMDBAPIManager.shared.searchTVShowResults(query: searchQuery, page: nextPage)
+                if !extra.isEmpty {
+                    tvResults.append(contentsOf: extra)
+                    tvPage = nextPage
+                }
+            } catch { }
+        }
+
+        // Books (Apple Books API uses offset)
+        if selectedCategories.contains(.books) {
+            let nextOffset = bookOffset
+            do {
+                let extra = try await AppleBooksAPIManager.shared.searchBooks(term: searchQuery, offset: nextOffset)
+                if !extra.isEmpty {
+                    bookResults.append(contentsOf: extra)
+                    // Resort by relevance
+                    bookResults = bookResults.sorted { ($0.trackName ?? "").relevanceScore(to: searchQuery) > ($1.trackName ?? "").relevanceScore(to: searchQuery) }
+                    bookOffset += extra.count
+                }
+            } catch { }
+        }
+
+        // Games (IGDB API offset)
+        if selectedCategories.contains(.games) {
+            let nextOffset = gameOffset
+            do {
+                let extra = try await IGDBAPIManager.shared.searchGameResults(query: searchQuery, offset: nextOffset)
+                if !extra.isEmpty {
+                    gameResults.append(contentsOf: extra)
+                    gameResults = gameResults.sorted { ($0.name ?? "").relevanceScore(to: searchQuery) > ($1.name ?? "").relevanceScore(to: searchQuery) }
+                    gameOffset += extra.count
+                }
+            } catch { }
+        }
+
+        // Comic Volumes (ComicVine offset)
+        if selectedCategories.contains(.comics) {
+            let nextOffset = volumeOffset
+            do {
+                let extra = try await ComicVineAPIManager.shared.searchVolumes(query: searchQuery, offset: nextOffset)
+                if !extra.isEmpty {
+                    volumeResults.append(contentsOf: extra)
+                    volumeResults = volumeResults.sorted { $0.title.relevanceScore(to: searchQuery) > $1.title.relevanceScore(to: searchQuery) }
+                    volumeOffset += extra.count
+                }
+            } catch { }
         }
     }
 }

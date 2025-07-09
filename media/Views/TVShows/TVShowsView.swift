@@ -161,11 +161,6 @@ struct TVShowRowView: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
-                    if let rating = tvShow.rating {
-                        Text(String(format: "%.1f", rating))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
                 }
             }
             

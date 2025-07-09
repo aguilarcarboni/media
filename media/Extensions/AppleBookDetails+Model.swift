@@ -13,7 +13,7 @@ extension AppleBookDetails {
             read: false,
             year: year,
             rating: nil,
-            appleRating: averageUserRating,
+            appleRating: averageUserRating.map { $0 * 2 },
             coverURLString: artworkUrl100,
             synopsis: description,
             releaseDate: releaseDateValue,

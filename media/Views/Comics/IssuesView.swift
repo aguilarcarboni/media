@@ -120,21 +120,12 @@ private struct ComicRowView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(comic.title).font(.headline).strikethrough(comic.read)
-                HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let series = comic.seriesName {
+                        Text("\(series)").font(.caption).foregroundStyle(.secondary)
+                    }
                     if let issue = comic.issueNumber {
                         Text("#\(issue)").font(.caption).foregroundStyle(.secondary)
-                    }
-                    if let series = comic.seriesName {
-                        Text("• \(series)").font(.caption).foregroundStyle(.secondary)
-                    }
-                    if let order = comic.readingOrderPosition {
-                        Text("• Ord \(order)").font(.caption).foregroundStyle(.secondary)
-                    }
-                    if let rating = comic.rating {
-                        Text("• ⭐ \(rating, specifier: "%.1f")").font(.caption).foregroundStyle(.secondary)
-                    }
-                    if comic.owned {
-                        Text("• 📚 Owned").font(.caption)
                     }
                 }
             }

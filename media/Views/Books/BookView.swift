@@ -119,29 +119,6 @@ struct BookView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
 
-                // Additional details
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Details").font(.headline)
-                    VStack(spacing: 8) {
-                        HStack { Text("Added:"); Spacer(); Text(book.created, format: .dateTime.day().month().year()) }
-                        if book.updated != book.created {
-                            HStack { Text("Updated:"); Spacer(); Text(book.updated, format: .dateTime.day().month().year()) }
-                        }
-                        if let appleId = book.appleBookId {
-                            HStack { Text("Apple Book ID:"); Spacer(); Text(appleId).foregroundStyle(.secondary) }
-                        }
-                        if let userRating = book.rating {
-                            HStack { Text("Your Rating:"); Spacer(); Text("⭐ \(userRating, specifier: "%.1f")") }
-                        }
-                        if let storeRating = book.appleRating {
-                            HStack { Text("Store Rating:"); Spacer(); Text("⭐ \(storeRating, specifier: "%.1f")") }
-                        }
-                    }
-                }
-                .padding()
-                .background(.regularMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-
                 // Backdrop / Cover image (matches MovieView/TVShowView layout)
                 ZStack(alignment: .bottomLeading) {
                     AsyncImage(url: book.coverURL) { image in

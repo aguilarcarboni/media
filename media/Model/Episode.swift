@@ -21,8 +21,13 @@ final class Episode: Identifiable {
     var episodeNumber: Int?
     var airDate: String?
     var runtime: Int?
-    var rating: Double?
+    var rating: Double? // Personal rating
+    var tmdbRating: Double? // API rating
     var stillPath: String?
+    
+    // User tracking
+    var watched: Bool = false
+    var watchedDate: Date?
 
     // Relationship back to parent TV show
     @Relationship(deleteRule: .nullify, inverse: \TVShow.episodes) var tvShow: TVShow?
@@ -41,6 +46,7 @@ final class Episode: Identifiable {
         airDate: String? = nil,
         runtime: Int? = nil,
         rating: Double? = nil,
+        tmdbRating: Double? = nil,
         stillPath: String? = nil,
         tvShow: TVShow? = nil
     ) {
@@ -53,6 +59,7 @@ final class Episode: Identifiable {
         self.airDate = airDate
         self.runtime = runtime
         self.rating = rating
+        self.tmdbRating = tmdbRating
         self.stillPath = stillPath
         self.tvShow = tvShow
         self.created = Date()
@@ -62,4 +69,18 @@ final class Episode: Identifiable {
     // MARK: - Computed
     var stillURL: URL? { TMDBAPIManager.shared.imageURL(path: stillPath) }
     var thumbnailURL: URL? { TMDBAPIManager.shared.thumbnailURL(path: stillPath) }
+
+    var displayRating: Double? { rating ?? tmdbRating }
+
+    // MARK: - Actions
+    func markAsWatched() {
+        watched = true
+        watchedDate = Date()
+        updated = Date()
+    }
+
+    func markAsUnwatched() {
+        watched = false
+        updated = Date()
+    }
 } 
