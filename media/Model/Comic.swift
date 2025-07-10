@@ -25,6 +25,9 @@ final class Comic: Identifiable {
     
     // Extended metadata & tracking
     @Relationship(deleteRule: .nullify, inverse: \Volume.issues) var volume: Volume?
+
+    @Relationship
+    var readingListItems: [ReadingListItem]? = []
     
     // Storyline / Event
     var storylineName: String?

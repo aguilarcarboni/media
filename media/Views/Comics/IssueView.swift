@@ -21,6 +21,7 @@ struct IssueView: View {
     @State private var tempRating: Double
     @State private var showingRatingSheet = false
     @State private var showingDeleteAlert = false
+    @State private var showingAddToReadingList = false
 
     init(comic: Comic, isPreview: Bool = false) {
         self._comic = Bindable(wrappedValue: comic)
@@ -218,6 +219,12 @@ struct IssueView: View {
                 // Overflow menu
                 ToolbarItem() {
                     Menu {
+                        Button("Add to Reading List", systemImage: "list.bullet.rectangle") {
+                            showingAddToReadingList = true
+                        }
+                        
+                        Divider()
+                        
                         if comic.comicVineId != nil {
                             Button("Refresh from Comic Vine") { refreshFromComicVine() }
                         }
@@ -226,6 +233,9 @@ struct IssueView: View {
             }
         }
         .sheet(isPresented: $showingRatingSheet) { ratingSheet }
+        .sheet(isPresented: $showingAddToReadingList) {
+            AddToReadingListView(comic: comic)
+        }
         .alert("Delete Issue?", isPresented: $showingDeleteAlert) {
             Button("Delete", role: .destructive) { modelContext.delete(comic); dismiss() }
             Button("Cancel", role: .cancel) { }

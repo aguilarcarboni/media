@@ -14,17 +14,20 @@ struct ComicsView: View {
     enum Section: Hashable {
         case volumes
         case issues
+        case readingLists
 
         var title: String {
             switch self {
             case .volumes: "Volumes"
             case .issues: "Issues"
+            case .readingLists: "Reading Lists"
             }
         }
         var systemImage: String {
             switch self {
             case .volumes: "books.vertical"
             case .issues: "book"
+            case .readingLists: "list.bullet.rectangle"
             }
         }
     }
@@ -40,12 +43,16 @@ struct ComicsView: View {
                 NavigationLink(value: Section.issues) {
                     Label(Section.issues.title, systemImage: Section.issues.systemImage)
                 }
+                NavigationLink(value: Section.readingLists) {
+                    Label(Section.readingLists.title, systemImage: Section.readingLists.systemImage)
+                }
             }
             .navigationTitle("Comics")
             .navigationDestination(for: Section.self) { section in
                 switch section {
                 case .volumes: VolumesView()
                 case .issues: IssuesView()
+                case .readingLists: ReadingListsView()
                 }
             }
         }

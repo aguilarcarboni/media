@@ -18,6 +18,8 @@ struct mediaApp: App {
             Book.self,
             Comic.self,
             Volume.self,
+            ReadingList.self,
+            ReadingListItem.self,
         ])
         
         // Configure for CloudKit
