@@ -15,6 +15,7 @@ struct BookView: View {
     // Environment
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     
     // Toolbar state
     @State private var showingDeleteAlert: Bool = false
@@ -198,6 +199,7 @@ struct BookView: View {
                 ToolbarItem() {
                     Menu {
                         if book.appleBookId != nil {
+                            Button("Open in Apple Books") { openInAppleBooks() }
                             Button("Refresh from Store") { refreshFromAppleBooks() }
                         }
                     } label: { Image(systemName: "ellipsis") }
@@ -215,6 +217,14 @@ struct BookView: View {
             Text("This action cannot be undone.")
         }
     }
+    private func openInAppleBooks() {
+        guard let idString = book.appleBookId else { return }
+        let urlString = "https://books.apple.com/book/id\(idString)"
+        if let url = URL(string: urlString) {
+            openURL(url)
+        }
+    }
+    
     private func refreshFromAppleBooks() {
         guard let idString = book.appleBookId, let id = Int(idString) else { return }
         Task {
